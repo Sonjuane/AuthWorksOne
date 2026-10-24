@@ -1,0 +1,31 @@
+{
+  "$schema": "../schemas/connector.schema.json",
+  "id": "google",
+  "name": "Google (Drive, Calendar)",
+  "authType": "oauth2",
+  "env": { "clientId": "HUB_GOOGLE_CLIENT_ID", "clientSecret": "HUB_GOOGLE_CLIENT_SECRET" },
+  "settings": {
+    "authorizeUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+    "tokenUrl": "https://oauth2.googleapis.com/token",
+    "scopes": [
+      "openid",
+      "email",
+      "https://www.googleapis.com/auth/drive.readonly",
+      "https://www.googleapis.com/auth/calendar.readonly"
+    ],
+    "pkce": true,
+    "clientAuth": "body",
+    "authorizeParams": { "access_type": "offline", "prompt": "consent", "include_granted_scopes": "true" },
+    "refresh": { "supported": true },
+    "revoke": { "url": "https://oauth2.googleapis.com/revoke", "method": "POST", "tokenIn": "body", "tokenType": "refresh_token" }
+  },
+  "baseUrl": { "fixed": "https://www.googleapis.com" },
+  "test": {
+    "method": "GET",
+    "path": "/oauth2/v3/userinfo",
+    "headers": { "authorization": "Bearer {{accessToken}}" },
+    "accountIdPath": "sub",
+    "accountNamePath": "email"
+  },
+  "auth": { "header": "Authorization", "format": "Bearer {{accessToken}}" }
+}

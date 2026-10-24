@@ -15,7 +15,9 @@
     "hub": "node --env-file=.env --env-file=.env.apps apps/hub/server.js",
     "hub:db:init": "node --env-file=.env scripts/hub-db-init.js",
     "hub:migrate": "node --env-file=.env scripts/hub-migrate.js",
-    "test": "node --test test/unit/*.test.js",
+    "hub:reencrypt": "node --env-file=.env scripts/hub-reencrypt.js",
+    "test": "node --test test/unit/*.test.js test/contract/*.test.js",
+    "test:contract": "node --test test/contract/*.test.js",
     "test:int": "node --env-file=.env --env-file=.env.apps --test --test-concurrency=1 test/integration/*.test.js",
     "rp": "node --env-file=.env --env-file=.env.apps apps/sample-rp/server.js",
     "profile": "node --env-file=.env --env-file=.env.apps apps/profile-app/server.js"

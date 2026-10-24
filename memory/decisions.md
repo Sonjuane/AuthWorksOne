@@ -40,6 +40,13 @@ Logto app IDs are generated per environment, so committed config keys apps by `k
 ## 2026-10-24 — Upgrade Logto 1.41 → 1.45 (user request)
 Image `svhd/logto:1.45` (core 1.45.0, latest stable). Ran `db alteration deploy 1.45.0` (16 alterations); pre-upgrade dump in `backup/` (git-ignored). Phase 0 probes re-ran with identical results. The AU-01 gap remains, so the §8 move stands. Supersedes "stay on 1.41" above.
 
+## 2026-10-24 — Hub API and extension-point shape (Phase 3; Q3, Q4, Q12 user choice)
+- **Q3:** `POST /v1/credentials` accepts `{connectionId}` or `{connectorId}`. The connector form lets an app start first consent without knowing a connection id.
+- **Q4:** discovery is `GET /v1/manifest`, generated from `openapi.json`. There is no MCP JSON-RPC transport.
+- **Q12:** the credential response adds `authType` and an `auth {header, format}` hint. Error codes beyond TV-06: `invalid_token`, `insufficient_scope`, `provider_unavailable`, `invalid_request`, `not_found`, `internal_error`.
+- **Connector `settings`:** auth-type-specific connector fields live under one `settings` object, validated by the handler's `definitionSchema`. This was chosen over a per-type top-level key, so new auth types (EX-04) need no schema change.
+- **Defaults and placement:** connectors are enabled unless `hub.connectors.<id>.enabled: false`, which keeps CN-04 a one-file change. Handler helpers (`HandlerError`, templating, test request, `interfaceErrors`) live in `core/extension.js`; handlers import core, never the reverse.
+
 ## 2026-10-24 — Hub foundation choices (Phase 2; Q5, Q8 user choice)
 - **Q8:** `postgres` (porsager, zero transitive deps) is the driver. The Hub UI will use Vite + `@vitejs/plugin-vue` + Tailwind v4.
 - **Q5:** `schema_migrations` has no `tenant_id` (runner metadata).

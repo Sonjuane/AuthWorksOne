@@ -28,6 +28,9 @@ The JWT-customizer script is generated from `customJwtClaims.fromCustomData` by 
 ## Sealed rows with AAD (Hub)
 Store secrets only as `vault.seal(value, \`${tenantId}|${table}|${rowId}\`)` in a `sealed bytea` column plus `key_version`. Open with the same AAD, so a blob copied to another row fails to decrypt. Hash bearer identifiers (session IDs, OAuth state) before using them as keys. Anti-pattern: separate IV/tag/DEK columns, or plaintext tokens in any column or session.
 
+## Extension modules are files in a directory (Hub)
+New connector: one JSON file in a connector directory. New auth type: one JS module default-exporting the handler, plus a fixture in `test/contract/fixtures.js`. Files starting with `_` are templates and are never loaded. Prove it with `npm run test:contract`; a handler without a fixture fails. Anti-pattern: `if (connector.id === 'x')` anywhere in `apps/hub/core/`. Express provider quirks as `settings` fields, or as a new auth type.
+
 ## Integration tests leave no trace
 Tests against the live tenant/DB create throwaway users/rows and delete them in `after()`. Append-only tables are exercised inside a transaction that is rolled back on purpose. Mutations that can't be undone (e.g. signing-key rotation) are opt-in by env flag.
 

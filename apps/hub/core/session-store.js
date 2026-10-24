@@ -1,10 +1,11 @@
 // Postgres session store for apps/lib/web.js (NF-02, NF-07): rows keyed by sha256(session id),
 // session data sealed by the vault so Logto tokens never sit in plaintext (S12).
 import { createHash } from 'node:crypto';
+import { aadFor } from './sealed.js';
 
 export function createSessionStore({ sql, vault, tenantId, ttlSeconds = 8 * 3600 }) {
   const hash = (sid) => createHash('sha256').update(sid).digest('hex');
-  const aad = (sidHash) => `${tenantId}|sessions|${sidHash}`;
+  const aad = (sidHash) => aadFor(tenantId, 'sessions', sidHash);
   return {
     async get(sid) {
       const sidHash = hash(sid);

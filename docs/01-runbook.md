@@ -63,9 +63,10 @@ npm run up              # compose `hub` service on :3030 (or `npm run hub` on th
 ```
 
 - **Startup refusal**: missing secrets, a non-https `HUB_BASE_URL` with `NODE_ENV=production`, or pending migrations → JSON log `startup_failed` with the reason, exit 1. The compose service restarts until fixed.
-- **Health**: `GET /health` → `{ meta, data: { status: "ok" } }` (checks the database).
+- **Health**: `GET /health` → `{ meta, data: { status: "ok" } }` (checks the database). API document: `GET /openapi.json`; tools list: `GET /v1/manifest`.
+- **Connectors**: the `started` log lists loaded `authTypes` and `connectors`. A connector without its client env logs `connector_skipped {id, missingEnv}`; an invalid definition stops startup with `startup_failed … Invalid Hub extensions` and the file + reason. Add or change one with [docs/03-hub-extensions.md](03-hub-extensions.md).
 - **Container networking**: the compose `hub` uses `postgres:5432` and fetches JWKS from `LOGTO_INTERNAL_ENDPOINT=http://logto:3001`; token `iss` stays `LOGTO_ENDPOINT`.
-- **Master keys**: back up `HUB_MASTER_KEYS` with `.env`. Losing a key version makes every record sealed with it unreadable. Rotate by adding `v2:<key>`, setting `HUB_MASTER_KEY_CURRENT=v2`, and running `npm run hub:reencrypt` (build plan task 3.7). Remove `v1` only after re-encrypt reports 0 rows.
+- **Master keys**: back up `HUB_MASTER_KEYS` with `.env`. Losing a key version makes every record sealed with it unreadable. Rotate by adding `v2:<key>`, setting `HUB_MASTER_KEY_CURRENT=v2`, restarting the Hub, and running `npm run hub:reencrypt` (`+ <table>: N row(s)`). Remove `v1` only after a second run reports `= <table>: 0 rows` for every table.
 - **Backup**: `docker compose exec postgres pg_dump -U logto -Fc hub > backup/hub-$(date +%F).dump` (same restore steps as §6, database `hub`).
 
 ## 5. Rotate OIDC signing keys

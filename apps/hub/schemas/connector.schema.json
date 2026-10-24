@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "connector.schema.json",
+  "title": "Connector Hub connector definition (CN-01)",
+  "description": "One file per connector in a connector directory. `settings` is validated by the bound auth type handler's definitionSchema. Provider client IDs/secrets are env var NAMES in `env`, never values (CN-02).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "authType", "baseUrl", "test"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": { "type": "string", "pattern": "^[a-z0-9-]+$", "description": "Stable id; a later connector directory overrides the same id" },
+    "name": { "type": "string" },
+    "authType": { "type": "string", "description": "Auth type handler `type` (oauth2, api_key, app_password, ...)" },
+    "env": {
+      "type": "object",
+      "description": "Handler input -> env var name (e.g. clientId -> HUBSPOT_CLIENT_ID). Missing env skips the connector with a log line.",
+      "additionalProperties": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" }
+    },
+    "settings": { "type": "object", "description": "Auth-type-specific settings (endpoints, scopes, PKCE, refresh, revoke)" },
+    "credentialFields": {
+      "type": "array",
+      "description": "Fields the user enters for non-OAuth auth types",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "label", "type"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9]*$" },
+          "label": { "type": "string" },
+          "type": { "enum": ["url", "string", "secret"] },
+          "required": { "type": "boolean", "default": true }
+        }
+      }
+    },
+    "baseUrl": {
+      "description": "Provider API base: fixed, or taken from a credential field (per connection)",
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["fixed"], "properties": { "fixed": { "type": "string", "format": "uri" } } },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fromField"],
+          "properties": { "fromField": { "type": "string" }, "pathSuffix": { "type": "string" } }
+        }
+      ]
+    },
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Credential test request (VA-03), relative to baseUrl. Header values may use {{accessToken}}, {{apiKey}}, {{username}}, {{basic}}.",
+      "required": ["method", "path"],
+      "properties": {
+        "method": { "enum": ["GET", "POST"] },
+        "path": { "type": "string", "pattern": "^/" },
+        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+        "expectStatus": { "type": "integer", "default": 200 },
+        "accountIdPath": { "type": "string", "description": "Dot path in the JSON response to the provider account id" },
+        "accountNamePath": { "type": "string" }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How apps send the issued secret to the provider (returned by POST /v1/credentials)",
+      "required": ["header", "format"],
+      "properties": { "header": { "type": "string" }, "format": { "type": "string" } }
+    }
+  }
+}

@@ -97,6 +97,18 @@ Changes from the task list:
 
 ### Phase 3 — Vault + extension points
 
+**Status 2026-10-24: done (3.1–3.7).** Proof:
+- `npm test` 77/77 (31 unit + 46 contract).
+- `npm run test:int` 18 passed, 1 skipped (opt-in).
+- The live Hub serves `GET /v1/manifest` and `GET /openapi.json` and logs the loaded auth types and connectors.
+- A mutation check confirmed the contract suite catches a handler that leaks a refresh token.
+
+Changes from the task list:
+- Connector `settings` replaces the per-type `oauth2` key (see §3.4), so a new auth type needs no schema change (EX-04).
+- Pulled forward from Phase 4: the four v1 definitions (task 4.2), and the mock provider core as `test/mock-provider/app.js` (in-process). Task 4.1 still adds the compose wrapper, the OIDC IdP, and the HTTP control API.
+- `core/sealed.js` lists the sealed tables and the AAD format, and drives `hub:reencrypt`.
+- Errors add `invalid_request`, `not_found`, `internal_error` (Q12).
+
 | Task | Reqs | Files | Done check |
 |---|---|---|---|
 | 3.1 OpenAPI first (§4), committed before routes; `GET /v1/manifest` generated from it | TV-07 | `apps/hub/openapi.json`, `apps/hub/core/manifest.js` | Contract test: every Hub API route maps to an `operationId`; responses validate against its schema (test mode). |
@@ -334,6 +346,8 @@ Vault (VA-02, `apps/hub/core/vault.js`): `HUB_MASTER_KEYS="v1:<b64 32B>,v2:<b64 
 Rules: handlers do no persistence, locking, or encryption (core owns those). Exactly one of `authorize`+`handleCallback` or `collectCredentials` is required. The contract suite (EX-06) asserts the interface shape, `definitionSchema` validity, a round trip against the mock, that `getCredentials` output has no `refreshToken`/`refresh_token` key, and that `revoke` is idempotent.
 
 ### 3.4 Connector definition schema (CN-01)
+
+> **As built (Phase 3):** the source of truth is [apps/hub/schemas/connector.schema.json](../apps/hub/schemas/connector.schema.json). Auth-type-specific fields sit under one `settings` object, validated by the bound handler's `definitionSchema`. The `oauth2` handler's schema holds the fields shown under `oauth2` below. The snippet below is the original outline. Authoring guide: [docs/03-hub-extensions.md](03-hub-extensions.md).
 
 ```json
 {
@@ -614,8 +628,8 @@ URL split: browser-facing authorize URLs use `http://localhost:3097`; container-
 |---|---|---|
 | Q1 | Cloudflare relay: build it here (Cloudflare Worker with the email-sending binding, or a Node service)? `http-email` sends only `{to, type, payload.code}`, so the relay must render EM-03 templates. | 1.10, EM-01/EM-03 Cloudflare path |
 | Q2 | E2E on a fresh DB needs the manual bootstrap (runbook §2: admin + M2M). Use a persistent, bootstrapped test volume, or seed the M2M app another way? | 8.1, CI |
-| Q3 | First-time consent needs a connector-level request: `POST /v1/credentials {connectorId}` (§4) vs. only `{connectionId}` as TV-05 literally states. | 5.2, S5 |
-| Q4 | Rule 05 asks for MCP discovery. The plan ships `GET /v1/manifest` (tools list); a full MCP JSON-RPC transport is not planned. OK? | 3.1 |
+| Q3 | **Resolved 2026-10-24:** `POST /v1/credentials` accepts `{connectionId}` or `{connectorId}`. | 5.2, S5 |
+| Q4 | **Resolved 2026-10-24:** `GET /v1/manifest` (generated tools list) only; no MCP JSON-RPC transport. | 3.1 |
 | Q5 | **Resolved 2026-10-24:** `schema_migrations` is runner metadata and has no `tenant_id`. | 2.3 |
 | Q6 | **Resolved 2026-10-24:** `roleAssignments[]` with emails from env (`OWNER_EMAILS`); the Console stays for ad-hoc assignment. | 1.12, S9 |
 | Q7 | **Resolved 2026-10-24:** `maxAttempts: 5`, `lockoutDuration: 15` (minutes). | 1.3 |
@@ -623,7 +637,7 @@ URL split: browser-facing authorize URLs use `http://localhost:3097`; container-
 | Q9 | A `User.Deleted` webhook missed while the Hub is down leaves orphaned connections. Add reconciliation (not in spec), or accept? | 5.4, VA-08 |
 | Q10 | Provision never deletes. Retiring `profile-app` leaves its Logto app; delete it manually in the Console or add `-` removal for config-dropped apps? | 6.7, AD-02 |
 | Q11 | **Resolved 2026-10-24:** provision gives `isDefault` roles to existing users with no roles. | 1.1 |
-| Q12 | TV-05 response adds `authType` and `auth` (header/format) beyond the spec's list, and errors add `invalid_token`, `insufficient_scope`, `provider_unavailable` beyond TV-06. OK? | 3.1, 5.2 |
+| Q12 | **Resolved 2026-10-24:** TV-05 response adds `authType` and `auth`; errors add `invalid_token`, `insufficient_scope`, `provider_unavailable`, plus `invalid_request`, `not_found`, `internal_error`. | 3.1, 5.2 |
 | Q13 | **Resolved 2026-10-24:** TTL-gated rotation satisfies ID-09. | 1.6 |
 | Q14 | The 1.41.0 Account Center bundle contains a `/profile` route, while `memory/gotchas.md` says it is missing. Re-check in a browser; the gotcha may be stale (no scope impact: profile editing is in the Hub UI per UI-01). | 6.3 |
 

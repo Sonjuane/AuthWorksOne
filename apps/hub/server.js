@@ -6,7 +6,9 @@ import { ConfigError, loadConfig } from './core/config.js';
 import { connect, pendingMigrations } from './core/db.js';
 import { errorHandler, respond, respondError, securityHeaders } from './core/http.js';
 import { createLogger } from './core/log.js';
+import { buildManifest, loadOpenApi } from './core/manifest.js';
 import { migrationFiles } from './core/migrate.js';
+import { DEFAULT_AUTH_TYPE_DIRS, DEFAULT_CONNECTOR_DIRS, dirsFromEnv, loadRegistry, RegistryError } from './core/registry.js';
 import { createSessionStore } from './core/session-store.js';
 import { createVault } from './core/vault.js';
 
@@ -28,6 +30,22 @@ for (const value of [config.ui.clientSecret, config.webhookSigningKey, config.da
 }
 for (const key of config.skippedClients) log.warn('client_skipped', { key, reason: 'no client ID in .env.apps (not provisioned in this profile)' });
 
+let registry;
+try {
+  registry = await loadRegistry({
+    authTypeDirs: dirsFromEnv(process.env.HUB_AUTH_TYPE_DIRS, DEFAULT_AUTH_TYPE_DIRS),
+    connectorDirs: dirsFromEnv(process.env.HUB_CONNECTOR_DIRS, DEFAULT_CONNECTOR_DIRS),
+    settings: config.connectorSettings,
+    log: (event, fields) => log.warn(event, fields),
+  });
+} catch (err) {
+  if (err instanceof RegistryError) fail(err.message);
+  throw err;
+}
+for (const entry of registry.connectors.values()) Object.values(entry.client).forEach(log.registerSecret);
+const openApi = loadOpenApi();
+const manifest = buildManifest(openApi);
+
 const sql = connect(config.databaseUrl);
 const pending = await pendingMigrations(sql, migrationFiles().map((m) => m.version)).catch((err) => fail(`database unavailable: ${err.message}`));
 if (pending.length) fail(`pending migrations ${pending.join(', ')}; run npm run hub:migrate`);
@@ -43,11 +61,20 @@ startApp({
   secureCookies: https,
   notFound: (ctx) => respondError(ctx, new ApiError(404, 'not_found', 'No such route')),
   onError: errorHandler(log),
-  onListen: () => log.info('started', { port: config.port, baseUrl: config.baseUrl, clients: [...config.clients.values()].map((c) => c.key) }),
+  onListen: () =>
+    log.info('started', {
+      port: config.port,
+      baseUrl: config.baseUrl,
+      clients: [...config.clients.values()].map((c) => c.key),
+      authTypes: [...registry.authTypes.keys()],
+      connectors: [...registry.connectors.keys()],
+    }),
   routes: {
     'GET /health': async (ctx) => {
       await sql`select 1`;
       return respond(ctx, { status: 'ok' });
     },
+    'GET /openapi.json': (ctx) => ctx.json(openApi),
+    'GET /v1/manifest': (ctx) => respond(ctx, manifest),
   },
 });

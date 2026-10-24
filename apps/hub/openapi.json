@@ -1,0 +1,207 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AuthWorksOne Connector Hub API",
+    "version": "1",
+    "description": "Short-lived third-party credentials for registered client apps, per user consent. Every response is an envelope: { meta, data } or { meta, error }."
+  },
+  "servers": [{ "url": "http://localhost:3030" }],
+  "components": {
+    "securitySchemes": {
+      "logto": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Logto access token for the Hub resource (aud = https://hub.authworks.local); scopes connections:read / connections:token"
+      }
+    },
+    "schemas": {
+      "Meta": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["requestId", "apiVersion"],
+        "properties": {
+          "requestId": { "type": "string", "pattern": "^req_" },
+          "apiVersion": { "const": "1" }
+        }
+      },
+      "Connection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "connectorId", "label", "status"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "connectorId": { "type": "string" },
+          "label": { "type": "string" },
+          "status": { "enum": ["active", "needs_reauth", "revoked", "error"] },
+          "baseUrl": { "type": "string" }
+        }
+      },
+      "CredentialRequest": {
+        "description": "Identify one connection, or a connector when the app does not know a connection id yet (first consent).",
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["connectionId"],
+            "properties": {
+              "connectionId": { "type": "string", "format": "uuid", "description": "Connection to get credentials for" },
+              "returnTo": { "type": "string", "description": "Where the consent page returns the user; must be one of the client's consentReturnUris" }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["connectorId"],
+            "properties": {
+              "connectorId": { "type": "string", "description": "Connector id (e.g. hubspot); resolves to the user's single consented connection for this app" },
+              "returnTo": { "type": "string", "description": "Where the consent page returns the user; must be one of the client's consentReturnUris" }
+            }
+          }
+        ]
+      },
+      "Credential": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["connectionId", "connectorId", "authType", "secret", "expiresAt", "baseUrl"],
+        "properties": {
+          "connectionId": { "type": "string", "format": "uuid" },
+          "connectorId": { "type": "string" },
+          "authType": { "type": "string" },
+          "secret": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Exactly the fields the auth type issues. Provider refresh tokens are never returned (TV-05).",
+            "properties": {
+              "accessToken": { "type": "string" },
+              "apiKey": { "type": "string" },
+              "username": { "type": "string" },
+              "appPassword": { "type": "string" }
+            }
+          },
+          "expiresAt": { "type": ["string", "null"], "format": "date-time" },
+          "baseUrl": { "type": "string" },
+          "auth": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "How to send the secret to the provider; `format` placeholders: {{accessToken}}, {{apiKey}}, {{basic}}",
+            "properties": { "header": { "type": "string" }, "format": { "type": "string" } }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": {
+            "enum": [
+              "consent_required",
+              "connection_reauth_required",
+              "connection_not_found",
+              "connector_not_allowed_for_client",
+              "client_not_registered",
+              "invalid_token",
+              "insufficient_scope",
+              "invalid_request",
+              "provider_unavailable",
+              "not_found",
+              "internal_error"
+            ]
+          },
+          "message": { "type": "string" },
+          "consentUrl": { "type": "string", "description": "consent_required: send the user here" },
+          "reconnectUrl": { "type": "string", "description": "connection_reauth_required: send the user here" }
+        }
+      },
+      "ConnectionList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["meta", "data"],
+        "properties": { "meta": { "$ref": "#/components/schemas/Meta" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Connection" } } }
+      },
+      "CredentialResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["meta", "data"],
+        "properties": { "meta": { "$ref": "#/components/schemas/Meta" }, "data": { "$ref": "#/components/schemas/Credential" } }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["meta", "error"],
+        "properties": { "meta": { "$ref": "#/components/schemas/Meta" }, "error": { "$ref": "#/components/schemas/Error" } }
+      },
+      "Tool": {
+        "type": "object",
+        "required": ["name", "description", "inputSchema"],
+        "properties": { "name": { "type": "string" }, "description": { "type": "string" }, "inputSchema": { "type": "object" } }
+      },
+      "Manifest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["meta", "data"],
+        "properties": {
+          "meta": { "$ref": "#/components/schemas/Meta" },
+          "data": {
+            "type": "object",
+            "required": ["tools"],
+            "properties": { "tools": { "type": "array", "items": { "$ref": "#/components/schemas/Tool" } } }
+          }
+        }
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Error envelope with a stable code (TV-06)",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      }
+    }
+  },
+  "paths": {
+    "/v1/connections": {
+      "get": {
+        "operationId": "list_connections",
+        "summary": "List consented connections",
+        "description": "List the signed-in user's connections that the user has consented to for the calling app (client_id from the token). Use when an app needs to show or pick a connection before requesting credentials.",
+        "security": [{ "logto": ["connections:read"] }],
+        "responses": {
+          "200": { "description": "Consented connections", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConnectionList" } } } },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/credentials": {
+      "post": {
+        "operationId": "get_credentials",
+        "summary": "Get short-lived provider credentials",
+        "description": "Return a provider access token (or API key / app password), its expiry, and the provider base URL for one consented connection. Tokens within 5 minutes of expiry are refreshed first. When the user has not consented, the error carries a consentUrl to send the user to; when the connection needs re-authorization, a reconnectUrl. Provider refresh tokens are never returned.",
+        "security": [{ "logto": ["connections:token"] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CredentialRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Credentials", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CredentialResponse" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/manifest": {
+      "get": {
+        "operationId": "manifest",
+        "summary": "Tool manifest",
+        "description": "MCP-style tools list generated from this document, for automated discovery.",
+        "security": [],
+        "responses": {
+          "200": { "description": "Tools", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Manifest" } } } }
+        }
+      }
+    }
+  }
+}

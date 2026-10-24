@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "auth-type.schema.json",
+  "title": "Connector Hub auth type handler manifest (EX-03)",
+  "description": "Data members of an auth type handler module's default export. Function members are checked by the registry and the contract suite (see apps/hub/auth-types/types.js).",
+  "type": "object",
+  "required": ["type", "definitionSchema", "requiredCredentialFields", "secretFields"],
+  "properties": {
+    "type": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "definitionSchema": { "type": "object", "description": "JSON Schema for the connector's `settings`" },
+    "requiredCredentialFields": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "credentialFields names every connector of this type must declare (empty for redirect flows)"
+    },
+    "secretFields": {
+      "type": "array",
+      "items": { "enum": ["accessToken", "apiKey", "username", "appPassword"] },
+      "minItems": 1,
+      "description": "Fields getCredentials() returns in `secret`"
+    }
+  }
+}

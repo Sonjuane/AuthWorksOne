@@ -1,0 +1,22 @@
+{
+  "$schema": "../schemas/connector.schema.json",
+  "id": "clickup",
+  "name": "ClickUp",
+  "authType": "oauth2",
+  "env": { "clientId": "CLICKUP_CLIENT_ID", "clientSecret": "CLICKUP_CLIENT_SECRET" },
+  "settings": {
+    "authorizeUrl": "https://app.clickup.com/api",
+    "tokenUrl": "https://api.clickup.com/api/v2/oauth/token",
+    "clientAuth": "query",
+    "refresh": { "supported": false }
+  },
+  "baseUrl": { "fixed": "https://api.clickup.com/api/v2" },
+  "test": {
+    "method": "GET",
+    "path": "/user",
+    "headers": { "authorization": "{{accessToken}}" },
+    "accountIdPath": "user.id",
+    "accountNamePath": "user.username"
+  },
+  "auth": { "header": "Authorization", "format": "{{accessToken}}" }
+}

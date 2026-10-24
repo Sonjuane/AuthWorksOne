@@ -1,0 +1,25 @@
+{
+  "$schema": "../schemas/connector.schema.json",
+  "id": "template",
+  "name": "Template (OAuth 2.0 provider)",
+  "authType": "oauth2",
+  "env": { "clientId": "TEMPLATE_CLIENT_ID", "clientSecret": "TEMPLATE_CLIENT_SECRET" },
+  "settings": {
+    "authorizeUrl": "https://provider.example/oauth/authorize",
+    "tokenUrl": "https://provider.example/oauth/token",
+    "scopes": ["read"],
+    "pkce": true,
+    "clientAuth": "basic",
+    "refresh": { "supported": true },
+    "revoke": { "url": "https://provider.example/oauth/revoke", "method": "POST", "tokenIn": "body", "tokenType": "refresh_token" }
+  },
+  "baseUrl": { "fixed": "https://api.provider.example" },
+  "test": {
+    "method": "GET",
+    "path": "/me",
+    "headers": { "authorization": "Bearer {{accessToken}}" },
+    "accountIdPath": "id",
+    "accountNamePath": "name"
+  },
+  "auth": { "header": "Authorization", "format": "Bearer {{accessToken}}" }
+}

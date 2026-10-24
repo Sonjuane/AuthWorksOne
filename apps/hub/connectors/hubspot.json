@@ -1,0 +1,24 @@
+{
+  "$schema": "../schemas/connector.schema.json",
+  "id": "hubspot",
+  "name": "HubSpot",
+  "authType": "oauth2",
+  "env": { "clientId": "HUBSPOT_CLIENT_ID", "clientSecret": "HUBSPOT_CLIENT_SECRET" },
+  "settings": {
+    "authorizeUrl": "https://app.hubspot.com/oauth/authorize",
+    "tokenUrl": "https://api.hubapi.com/oauth/v1/token",
+    "scopes": ["oauth", "crm.objects.contacts.read"],
+    "clientAuth": "body",
+    "refresh": { "supported": true },
+    "revoke": { "url": "https://api.hubapi.com/oauth/v1/refresh-tokens/{{token}}", "method": "DELETE", "tokenIn": "path", "tokenType": "refresh_token" }
+  },
+  "baseUrl": { "fixed": "https://api.hubapi.com" },
+  "test": {
+    "method": "GET",
+    "path": "/account-info/v3/details",
+    "headers": { "authorization": "Bearer {{accessToken}}" },
+    "accountIdPath": "portalId",
+    "accountNamePath": "uiDomain"
+  },
+  "auth": { "header": "Authorization", "format": "Bearer {{accessToken}}" }
+}

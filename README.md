@@ -23,7 +23,7 @@ Sign up at `http://localhost:3010` (verification code prints in the mailbox log;
 
 Connector Hub (`:3030`): set the `HUB_*` values in `.env` (see `.env.example`), then `npm run hub:db:init && npm run hub:migrate`. `npm run up` runs it in compose ([docs/01-runbook.md §4b](docs/01-runbook.md)).
 
-Checks: `npm test` (unit), `npm run test:int` (live tenant + Hub database: provisioning, applied config, role claims, Hub foundation), `npm run verify:logto` (LV-01–LV-09).
+Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only), `npm run test:int` (live tenant + Hub database: provisioning, applied config, role claims, Hub foundation), `npm run verify:logto` (LV-01–LV-09).
 
 ## What runs where
 
@@ -42,20 +42,21 @@ Checks: `npm test` (unit), `npm run test:int` (live tenant + Hub database: provi
 | Path | Contents |
 | --- | --- |
 | [docker-compose.yml](docker-compose.yml) | Logto 1.45 + PostgreSQL 17 (127.0.0.1:5432), named volume, healthchecks; `mailbox` and `hub` services (profiles `dev`, `test`) |
-| [apps/hub/](apps/hub/) | Connector Hub: `server.js`, `core/` (config, vault, logger, auth, db, migrations runner, sessions, HTTP envelope), `migrations/`, `Dockerfile` |
+| [apps/hub/](apps/hub/) | Connector Hub: `server.js`, `openapi.json` (API source of truth), `core/` (config, vault, sealed tables, logger, auth, registry, extension helpers, manifest, db, migrations, sessions, HTTP envelope), `auth-types/` + `connectors/` (extension points), `schemas/`, `migrations/`, `Dockerfile` |
 | [config/sso.config.json](config/sso.config.json) | Declarative SSO config: resources + scopes, roles, role assignments, applications (+ Hub client settings), social connectors, email provider, webhooks, sign-in experience (MFA, lockout, account linking), account center, custom profile fields, JWT claims, Hub settings |
 | [config/schemas/sso.config.schema.json](config/schemas/sso.config.schema.json) | JSON Schema for the config (editor validation + contract) |
 | [scripts/provision.js](scripts/provision.js) | Idempotent apply of the config via Management API; writes app credentials to `.env.apps` |
 | [scripts/rotate-keys.js](scripts/rotate-keys.js) | OIDC signing-key rotation + JWKS verification |
 | [scripts/dev-mailbox.js](scripts/dev-mailbox.js) | Dev-only receiver for the `http-email` fallback connector |
 | [scripts/verify-logto.js](scripts/verify-logto.js) | Live LV-01–LV-09 checks; restores the tenant |
-| [scripts/hub-db-init.js](scripts/hub-db-init.js), [scripts/hub-migrate.js](scripts/hub-migrate.js) | Hub role/database creation and migrations (idempotent) |
+| [scripts/hub-db-init.js](scripts/hub-db-init.js), [scripts/hub-migrate.js](scripts/hub-migrate.js), [scripts/hub-reencrypt.js](scripts/hub-reencrypt.js) | Hub role/database creation, migrations, master-key re-encryption (idempotent) |
 | [scripts/lib/](scripts/lib/) | Management API client; JWT-customizer script generator; Experience API sign-in driver; mock OIDC IdP; TOTP |
-| [test/](test/) | `unit/` (config schema, generated scripts, Hub core, repo hygiene), `integration/` (live tenant, Hub database) |
+| [test/](test/) | `unit/` (config schema, generated scripts, Hub core + registry + OpenAPI, repo hygiene), `contract/` (EX-06 suites), `integration/` (live tenant, Hub database), `mock-provider/` (mock OAuth/API provider), `fixtures/` |
 | [apps/lib/](apps/lib/) | Shared utilities: OIDC relying-party helper (PKCE, JWKS verify, logout), access-token verifier (`jwt.js`), minimal HTTP/session/HTML helper (pluggable session store) |
 | [apps/sample-rp/server.js](apps/sample-rp/server.js) | Sample third-party app (issuer + client ID/secret only) |
 | [apps/profile-app/server.js](apps/profile-app/server.js) | Custom-branded profile editor against the Account API |
 | [docs/01-runbook.md](docs/01-runbook.md) | Operations: bootstrap, add an app, connectors, key rotation, backup/restore, secrets, production |
+| [docs/03-hub-extensions.md](docs/03-hub-extensions.md) | Authoring guide: add a Hub connector or auth type; contract suites |
 | [docs/02-build-plan.md](docs/02-build-plan.md) | Build plan for the Logto extensions + Connector Hub: Phase 0 results, phases/tasks, traceability matrix, Hub design, API outline, config changes, test plan, open questions |
 | [memory/](memory/) | LLM wiki (architecture, decisions, patterns, gotchas, domain) |
 
@@ -70,6 +71,8 @@ Checks: `npm test` (unit), `npm run test:int` (live tenant + Hub database: provi
 - **Assign a role by config**: put emails in the env var named by `roleAssignments[].emailsEnv` (e.g. `OWNER_EMAILS`) → `npm run provision` ([docs/01-runbook.md §4a](docs/01-runbook.md)).
 - **Rotate signing keys**: `npm run rotate-keys` ([docs/01-runbook.md §5](docs/01-runbook.md)).
 - **Verify Logto features (before any image upgrade)**: `npm run verify:logto` (needs `.env.apps` from provision). It runs the LV-01–LV-09 checks live and restores the tenant afterwards; any `FAIL` or `tenant CHANGED` blocks the upgrade.
+- **Add a Hub connector or auth type**: new file in `apps/hub/connectors/` or `apps/hub/auth-types/` → `npm run test:contract` → restart the Hub ([docs/03-hub-extensions.md](docs/03-hub-extensions.md)).
+- **Rotate the Hub master key**: add `v2:<key>` to `HUB_MASTER_KEYS`, set `HUB_MASTER_KEY_CURRENT=v2`, `npm run hub:reencrypt` ([docs/01-runbook.md §4b](docs/01-runbook.md)).
 - **Backup / restore**: [docs/01-runbook.md §6](docs/01-runbook.md).
 
 ## Verification checklist

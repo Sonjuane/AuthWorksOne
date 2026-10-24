@@ -1,0 +1,20 @@
+{
+  "$schema": "../schemas/connector.schema.json",
+  "id": "wordpress",
+  "name": "WordPress (self-hosted)",
+  "authType": "app_password",
+  "credentialFields": [
+    { "name": "siteUrl", "label": "Site URL", "type": "url" },
+    { "name": "username", "label": "Username", "type": "string" },
+    { "name": "appPassword", "label": "Application password", "type": "secret" }
+  ],
+  "baseUrl": { "fromField": "siteUrl", "pathSuffix": "/wp-json" },
+  "test": {
+    "method": "GET",
+    "path": "/wp/v2/users/me?context=edit",
+    "headers": { "authorization": "Basic {{basic}}" },
+    "accountIdPath": "id",
+    "accountNamePath": "name"
+  },
+  "auth": { "header": "Authorization", "format": "Basic {{basic}}" }
+}
