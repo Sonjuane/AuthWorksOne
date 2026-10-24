@@ -52,6 +52,15 @@ With a `Prompt*` MFA policy, `POST /api/experience/submit` for a user without MF
 ## Containers can't use the public issuer URL for server-to-server calls
 `LOGTO_ENDPOINT=http://localhost:3001` is the token `iss` and the browser URL, but `localhost` inside a container is the container itself. Fetch the JWKS (and later token endpoints) via `LOGTO_INTERNAL_ENDPOINT=http://logto:3001`, while still validating `iss` against the public issuer.
 
+## Logto discovery endpoints follow the request Host
+Fetching `/oidc/.well-known/openid-configuration` from `http://logto:3001` returns `issuer` = the public `ENDPOINT`, but `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and `end_session_endpoint` all come back on `http://logto:3001`. Server-side calls can use those directly. URLs sent to a browser must be rewritten to the public origin (`apps/lib/oidc.js` `internalOrigin`).
+
+## openid-client derives redirect_uri from the callback URL you pass
+`authorizationCodeGrant(config, currentUrl)` uses `currentUrl` (minus its query) as `redirect_uri`. Build it from the public base URL, not from the server's bind address (`http://localhost:<port>` behind a proxy breaks the code exchange).
+
+## Race tests need a slow provider
+With an in-process mock answering refreshes in ~1 ms, 20 concurrent `issue()` calls happened to serialize, and the refresh test passed even with the advisory lock removed. `control.setRefreshDelay(200)` makes the overlap real: 8 refreshes without the lock, 1 with it.
+
 ## Signing-key rotation can permanently drop old keys
 `POST /api/configs/oidc/private-keys/rotate` keeps only keys within `rotationGracePeriod`. Rotating when 2 keys already exist can remove the oldest one, and deleted keys can't be restored. That's why the ID-10 integration test is opt-in.
 

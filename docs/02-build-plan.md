@@ -121,6 +121,19 @@ Changes from the task list:
 
 ### Phase 4 — Mock provider, connectors, connections
 
+**Status 2026-10-24: done (4.1–4.7).** Proof:
+- `npm test` 95/95.
+- `npm run test:int` 33 passed, 1 skipped (opt-in).
+- `hub-connections.test.js` covers the connection service against the real DB and the mock (VA-01–VA-07, CN-04, the S7 refresh path, and NF-07). Twenty concurrent requests across two instances produce exactly 1 refresh; with the advisory lock removed, the same test sees 8.
+- `hub-ui-session.test.js` covers the live compose Hub: Logto login, silent re-login, CSRF/session guards, and the SSRF guard.
+
+Changes from the task list:
+- Task 6.2 (Hub UI login, `routes/auth.js`) was pulled forward because connect flows need a signed-in user.
+- `apps/lib/oidc.js` gained `internalOrigin`. Logto builds endpoint URLs from the request Host, so in-container discovery returns internal URLs, and browser URLs are rewritten back to the public origin.
+- The JSON UI API (`routes/ui-api.js`) and the CSRF guard (part of 6.6) landed now.
+- Expired sessions and OAuth states are purged at startup and hourly.
+- The compose mock OIDC IdP for E2E login (S2, S18) moves to Phase 8; the verifier keeps its in-process IdP.
+
 | Task | Reqs | Files | Done check |
 |---|---|---|---|
 | 4.1 Mock provider (§7.3) | NF-04 | `test/mock-provider/server.js`, compose | Healthy; control API resets and reports call counts. |
@@ -146,7 +159,7 @@ Changes from the task list:
 | Task | Reqs | Files | Done check |
 |---|---|---|---|
 | 6.1 Vue 3 + Tailwind (Vite) app; theme tokens from `signInExperience.color` and branding | UI-06 | `apps/hub/ui/**`, `apps/hub/vite.config.js` | E2E at 375 px: no horizontal scroll; primary color = config `primaryColor`. |
-| 6.2 Hub UI login via `apps/lib/oidc.js`; silent SSO | HA-04 | `apps/hub/routes/auth.js` | S3. |
+| 6.2 Hub UI login via `apps/lib/oidc.js`; silent SSO — **done in Phase 4** (live test: login, silent re-login, logout) | HA-04 | `apps/hub/routes/auth.js` | S3 (E2E with the reference app in Phase 8). |
 | 6.3 Account: profile (name, avatar, `displayName`, `jobTitle`, timezone) via Account API; links to Account Center security, 2FA, sessions | UI-01, ID-06 | `apps/hub/ui/src/views/Account.vue`, `ui-api.js` | E2E edit → `GET /api/my-account` reflects it; links resolve (200). |
 | 6.4 Connections (add, relabel, reconnect, delete, status), App access (grants + revoke), Consent page | UI-02, UI-03, UI-04, TV-02, TV-03 | `apps/hub/ui/src/views/{Connections,AppAccess,Consent}.vue` | S4, S5, S8. |
 | 6.5 Hub admin (`owner`/`admin` from the `roles` claim): connector status, client settings (read-only), audit list with filters | UI-05, AU-04 | `apps/hub/ui/src/views/Admin*.vue`, `ui-api.js` | E2E: admin sees views and filters by user/event/client/date; `user` role → 403. |
@@ -647,7 +660,7 @@ URL split: browser-facing authorize URLs use `http://localhost:3097`; container-
 |---|---|---|
 | R1 | Logto hosted-page DOM changes break Playwright. | Pinned image; page objects in one file; `verify:logto` before upgrades. |
 | R2 | Account linking only happens in Logto's hosted UI (gotchas). | Use the hosted UI only; API tests replicate `linkSocialIdentity: true`. |
-| R3 | SSRF through per-connection WordPress `siteUrl`. | `http-client.js` guard: https only in production; block private/loopback/link-local ranges unless `HUB_ALLOW_PRIVATE_URLS=1` (dev/test). |
+| R3 | SSRF through per-connection WordPress `siteUrl`. | **Implemented** (`core/http-client.js`): https only; addresses are resolved and loopback/private/link-local/CGNAT/multicast are blocked (IPv4, IPv6, IPv4-mapped); no redirects; 10 s timeout. `HUB_ALLOW_PRIVATE_URLS=1` relaxes this for dev/test and is refused in production. Residual: DNS rebinding between check and connect. |
 | R4 | Provider quirks outgrow the declarative schema (CN-04 "where possible"). | Quirk fields in §3.4; anything else becomes a new auth type (EX-04), never core code. |
 | R5 | Logto tokens in Hub session rows would fail S12. | Session data is vault-encrypted (2.6). |
 | R6 | `http-email` is a single Logto connector shared by the dev fallback and the Cloudflare relay. | `email` section owns it; one endpoint chosen by provider/env (5.3). |

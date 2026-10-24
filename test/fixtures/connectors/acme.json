@@ -1,0 +1,44 @@
+{
+  "$schema": "../../../apps/hub/schemas/connector.schema.json",
+  "id": "acme",
+  "name": "Acme CRM (new connector, CN-04)",
+  "authType": "oauth2",
+  "env": {
+    "clientId": "ACME_CLIENT_ID",
+    "clientSecret": "ACME_CLIENT_SECRET"
+  },
+  "settings": {
+    "authorizeUrl": "http://localhost:3097/oauth/authorize",
+    "tokenUrl": "http://mock-provider:3097/oauth/token",
+    "scopes": [
+      "read"
+    ],
+    "clientAuth": "basic",
+    "refresh": {
+      "supported": true
+    },
+    "pkce": true,
+    "revoke": {
+      "url": "http://mock-provider:3097/oauth/revoke",
+      "method": "POST",
+      "tokenIn": "body",
+      "tokenType": "refresh_token"
+    }
+  },
+  "baseUrl": {
+    "fixed": "http://mock-provider:3097"
+  },
+  "test": {
+    "method": "GET",
+    "path": "/api/me",
+    "headers": {
+      "authorization": "Bearer {{accessToken}}"
+    },
+    "accountIdPath": "id",
+    "accountNamePath": "name"
+  },
+  "auth": {
+    "header": "Authorization",
+    "format": "Bearer {{accessToken}}"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "../../../apps/hub/schemas/connector.schema.json",
+  "id": "google",
+  "name": "Google (mock)",
+  "authType": "oauth2",
+  "env": {
+    "clientId": "HUB_GOOGLE_CLIENT_ID",
+    "clientSecret": "HUB_GOOGLE_CLIENT_SECRET"
+  },
+  "settings": {
+    "authorizeUrl": "http://localhost:3097/oauth/authorize",
+    "tokenUrl": "http://mock-provider:3097/oauth/token",
+    "scopes": [
+      "read"
+    ],
+    "clientAuth": "body",
+    "refresh": {
+      "supported": true
+    },
+    "pkce": true,
+    "authorizeParams": {
+      "access_type": "offline",
+      "prompt": "consent"
+    },
+    "revoke": {
+      "url": "http://mock-provider:3097/oauth/revoke",
+      "method": "POST",
+      "tokenIn": "body",
+      "tokenType": "refresh_token"
+    }
+  },
+  "baseUrl": {
+    "fixed": "http://mock-provider:3097"
+  },
+  "test": {
+    "method": "GET",
+    "path": "/api/me",
+    "headers": {
+      "authorization": "Bearer {{accessToken}}"
+    },
+    "accountIdPath": "id",
+    "accountNamePath": "name"
+  },
+  "auth": {
+    "header": "Authorization",
+    "format": "Bearer {{accessToken}}"
+  }
+}

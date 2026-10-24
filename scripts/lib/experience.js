@@ -17,16 +17,18 @@ const parse = (text) => {
   try { return text ? JSON.parse(text) : null; } catch { return text; }
 };
 
-// Minimal browser: cookie jar, no automatic redirects, JSON in/out. Relative URLs resolve to Logto.
-export function browser() {
+// Minimal browser: cookie jar, no automatic redirects, JSON in/out. Relative URLs resolve to
+// `base` (default: Logto).
+export function browser(base = endpoint()) {
   const jar = new Map();
-  return async (method, url, body) => {
-    const res = await fetch(new URL(url, endpoint()), {
+  return async (method, url, body, headers = {}) => {
+    const res = await fetch(new URL(url, base), {
       method,
       redirect: 'manual',
       headers: {
         cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '),
         ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+        ...headers,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
@@ -48,6 +50,52 @@ const submit = async (req) => {
   ok(await req('POST', '/api/experience/profile/mfa/mfa-skipped'), 'skip MFA prompt');
   return req('POST', '/api/experience/submit');
 };
+
+// Follows Logto's post-submit redirects (auto-approving first-party consent) until `done(url)`.
+const followRedirects = async (req, start, done) => {
+  const logtoOrigin = new URL(endpoint()).origin;
+  let location = new URL(start, endpoint()).href;
+  for (let i = 0; i < 10 && !done(location); i++) {
+    const url = new URL(location);
+    if (url.origin === logtoOrigin && url.pathname.startsWith('/consent')) {
+      location = new URL(ok(await req('POST', '/api/interaction/consent', {}), 'consent').redirectTo, endpoint()).href;
+      continue;
+    }
+    const res = await req('GET', location);
+    if (!res.location) throw new Error(`redirect chain stopped at ${location} (${res.status})`);
+    location = new URL(res.location, location).href;
+  }
+  return location;
+};
+
+// Password sign-in steps inside an open experience interaction; returns the submit redirect.
+const passwordSteps = async (req, email, password) => {
+  const pw = ok(await req('POST', '/api/experience/verification/password', { identifier: { type: 'email', value: email }, password }), 'password');
+  ok(await req('POST', '/api/experience/identification', { verificationId: pw.verificationId }), 'identification');
+  return ok(await submit(req), 'submit').redirectTo;
+};
+
+// Signs in through an app's own login route (the app runs PKCE/state, e.g. the Hub's /login) and
+// returns that app's browser, holding the signed-in session cookie. With an existing Logto
+// session in `logto` (pass the browser from a previous call), sign-in is silent (SSO).
+export async function appSignIn({ appUrl, loginPath = '/login', email, password, logto = browser() }) {
+  const app = browser(appUrl);
+  const appOrigin = new URL(appUrl).origin;
+  const start = await app('GET', loginPath);
+  if (!start.location) throw new Error(`${appUrl}${loginPath} did not redirect (${start.status})`);
+  const authorize = await logto('GET', start.location);
+  let location = new URL(authorize.location, start.location).href;
+  const atApp = (url) => new URL(url).origin === appOrigin;
+  if (!atApp(location) && new URL(location).pathname.startsWith('/sign-in')) {
+    // No usable Logto session: run the password interaction.
+    ok(await logto('PUT', '/api/experience', { interactionEvent: 'SignIn' }), 'start experience');
+    location = await passwordSteps(logto, email, password);
+  }
+  location = await followRedirects(logto, location, atApp);
+  const callback = await app('GET', location);
+  if (callback.status >= 400) throw new Error(`app callback -> ${callback.status} ${JSON.stringify(callback.data)}`);
+  return { app, logto };
+}
 
 // Logto Account API call with a user access token (opaque, no resource).
 export async function accountApi(accessToken, method, path, body, verificationId) {
@@ -103,16 +151,7 @@ export function createClient({ clientId, clientSecret, redirectUri }) {
     ok(await req('PUT', '/api/experience', { interactionEvent }), 'start experience');
 
     const finish = async (redirectTo) => {
-      let location = new URL(redirectTo, endpoint()).href;
-      for (let i = 0; i < 10 && !location.startsWith(redirectUri); i++) {
-        if (new URL(location).pathname.startsWith('/consent')) {
-          location = new URL(ok(await req('POST', '/api/interaction/consent', {}), 'consent').redirectTo, endpoint()).href;
-          continue;
-        }
-        const res = await req('GET', location);
-        if (!res.location) throw new Error(`redirect chain stopped at ${location} (${res.status})`);
-        location = new URL(res.location, location).href;
-      }
+      const location = await followRedirects(req, redirectTo, (url) => url.startsWith(redirectUri));
       const code = new URL(location).searchParams.get('code');
       const res = await token({ grant_type: 'authorization_code', code, redirect_uri: redirectUri, code_verifier: verifier });
       if (res.status !== 200) throw new Error(`code exchange -> ${res.status} ${JSON.stringify(res.data)}`);

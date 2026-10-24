@@ -1,0 +1,43 @@
+{
+  "$schema": "../../../apps/hub/schemas/connector.schema.json",
+  "id": "hubspot",
+  "name": "HubSpot (mock)",
+  "authType": "oauth2",
+  "env": {
+    "clientId": "HUBSPOT_CLIENT_ID",
+    "clientSecret": "HUBSPOT_CLIENT_SECRET"
+  },
+  "settings": {
+    "authorizeUrl": "http://localhost:3097/oauth/authorize",
+    "tokenUrl": "http://mock-provider:3097/oauth/token",
+    "scopes": [
+      "read"
+    ],
+    "clientAuth": "body",
+    "refresh": {
+      "supported": true
+    },
+    "revoke": {
+      "url": "http://mock-provider:3097/oauth/refresh-tokens/{{token}}",
+      "method": "DELETE",
+      "tokenIn": "path",
+      "tokenType": "refresh_token"
+    }
+  },
+  "baseUrl": {
+    "fixed": "http://mock-provider:3097"
+  },
+  "test": {
+    "method": "GET",
+    "path": "/api/me",
+    "headers": {
+      "authorization": "Bearer {{accessToken}}"
+    },
+    "accountIdPath": "id",
+    "accountNamePath": "name"
+  },
+  "auth": {
+    "header": "Authorization",
+    "format": "Bearer {{accessToken}}"
+  }
+}

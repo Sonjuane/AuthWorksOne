@@ -35,14 +35,15 @@ Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only
 | `http://localhost:3010` | Sample RP: PKCE login, ID-token/userinfo/JWT-access-token views, SSO logout |
 | `http://localhost:3020` | Custom profile UI: edits name/avatar/custom fields via the Account API |
 | `http://localhost:3099` | Dev mailbox container: JSON list of received emails (`npm run mailbox` tails it) |
-| `http://localhost:3030` | Connector Hub (`GET /health`; API and UI arrive in later build phases) |
+| `http://localhost:3030` | Connector Hub: `/login`, `/connect/start`, `/ui-api/*` (JSON for the Hub UI), `/health`, `/openapi.json` (Vue UI and app API arrive in later build phases) |
+| `http://localhost:3097` | Mock provider (compose profile `test`): OAuth 2.0 + APIs + `/_control/*` |
 
 ## Repository map
 
 | Path | Contents |
 | --- | --- |
 | [docker-compose.yml](docker-compose.yml) | Logto 1.45 + PostgreSQL 17 (127.0.0.1:5432), named volume, healthchecks; `mailbox` and `hub` services (profiles `dev`, `test`) |
-| [apps/hub/](apps/hub/) | Connector Hub: `server.js`, `openapi.json` (API source of truth), `core/` (config, vault, sealed tables, logger, auth, registry, extension helpers, manifest, db, migrations, sessions, HTTP envelope), `auth-types/` + `connectors/` (extension points), `schemas/`, `migrations/`, `Dockerfile` |
+| [apps/hub/](apps/hub/) | Connector Hub: `server.js`, `openapi.json` (API source of truth), `core/` (config, vault, sealed tables, connections, audit, SSRF-guarded HTTP, logger, auth, security, registry, extension helpers, manifest, db, migrations, sessions, HTTP envelope), `routes/` (login, connect, UI API), `auth-types/` + `connectors/` (extension points), `schemas/`, `migrations/`, `Dockerfile` |
 | [config/sso.config.json](config/sso.config.json) | Declarative SSO config: resources + scopes, roles, role assignments, applications (+ Hub client settings), social connectors, email provider, webhooks, sign-in experience (MFA, lockout, account linking), account center, custom profile fields, JWT claims, Hub settings |
 | [config/schemas/sso.config.schema.json](config/schemas/sso.config.schema.json) | JSON Schema for the config (editor validation + contract) |
 | [scripts/provision.js](scripts/provision.js) | Idempotent apply of the config via Management API; writes app credentials to `.env.apps` |

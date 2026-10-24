@@ -1,9 +1,13 @@
 // Connector Hub service entry point: validate config and secrets, require an up-to-date schema,
 // then serve HTTP. Refuses to start (exit 1) when anything required is missing (NF-05).
+import { createOidc } from '../lib/oidc.js';
 import { startApp } from '../lib/web.js';
+import { createAudit } from './core/audit.js';
 import { ApiError } from './core/auth.js';
 import { ConfigError, loadConfig } from './core/config.js';
+import { createConnections } from './core/connections.js';
 import { connect, pendingMigrations } from './core/db.js';
+import { createHttpClient } from './core/http-client.js';
 import { errorHandler, respond, respondError, securityHeaders } from './core/http.js';
 import { createLogger } from './core/log.js';
 import { buildManifest, loadOpenApi } from './core/manifest.js';
@@ -11,6 +15,9 @@ import { migrationFiles } from './core/migrate.js';
 import { DEFAULT_AUTH_TYPE_DIRS, DEFAULT_CONNECTOR_DIRS, dirsFromEnv, loadRegistry, RegistryError } from './core/registry.js';
 import { createSessionStore } from './core/session-store.js';
 import { createVault } from './core/vault.js';
+import { authRoutes } from './routes/auth.js';
+import { connectRoutes } from './routes/connect.js';
+import { uiApiRoutes } from './routes/ui-api.js';
 
 const log = createLogger({ base: { service: 'hub' } });
 const fail = (reason) => {
@@ -53,6 +60,37 @@ if (pending.length) fail(`pending migrations ${pending.join(', ')}; run npm run 
 const vault = createVault({ keys: config.masterKeys, current: config.currentKeyVersion });
 const https = config.baseUrl.startsWith('https://');
 
+// Expired sessions and abandoned connector OAuth flows: purged at startup and hourly (safe on every instance).
+const purgeExpired = () =>
+  sql`with s as (delete from sessions where expires_at < now() returning 1), o as (delete from oauth_states where expires_at < now() returning 1)
+      select (select count(*) from s)::int as sessions, (select count(*) from o)::int as states`
+    .then(([counts]) => (counts.sessions || counts.states) && log.info('expired_purged', counts))
+    .catch((err) => log.warn('purge_failed', { error: err }));
+await purgeExpired();
+setInterval(purgeExpired, 3600_000).unref();
+if (config.allowPrivateUrls) log.warn('ssrf_guard_relaxed', { reason: 'HUB_ALLOW_PRIVATE_URLS=1 (dev/test only)' });
+
+const oidc = await createOidc({
+  issuer: config.issuer,
+  clientId: config.ui.clientId,
+  clientSecret: config.ui.clientSecret,
+  baseUrl: config.baseUrl,
+  scope: config.ui.scope,
+  resource: config.resource,
+  internalOrigin: config.logtoInternalOrigin,
+}).catch((err) => fail(`Logto discovery failed: ${err.message}`));
+
+const connections = createConnections({
+  sql,
+  vault,
+  registry,
+  tenantId: config.tenantId,
+  http: createHttpClient({ allowPrivate: config.allowPrivateUrls }),
+  baseUrl: config.baseUrl,
+  audit: createAudit({ sql, tenantId: config.tenantId, redact: log.redact }),
+  log,
+});
+
 startApp({
   name: 'Connector Hub',
   port: config.port,
@@ -76,5 +114,8 @@ startApp({
     },
     'GET /openapi.json': (ctx) => ctx.json(openApi),
     'GET /v1/manifest': (ctx) => respond(ctx, manifest),
+    ...authRoutes({ oidc, baseUrl: config.baseUrl }),
+    ...connectRoutes({ connections }),
+    ...uiApiRoutes({ connections }),
   },
 });

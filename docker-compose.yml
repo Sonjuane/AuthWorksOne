@@ -45,6 +45,18 @@ services:
       - "3099:3099"
     restart: unless-stopped
 
+  # Test only: mock third-party provider (OAuth 2.0 server + APIs + control API) for E2E.
+  mock-provider:
+    image: node:24-alpine
+    profiles: ["test"]
+    working_dir: /app
+    command: ["node", "test/mock-provider/server.js"]
+    volumes:
+      - ./test/mock-provider:/app/test/mock-provider:ro
+    ports:
+      - "3097:3097"
+    restart: unless-stopped
+
   # Connector Hub. Needs `npm run provision`, `npm run hub:db:init`, `npm run hub:migrate` first;
   # until then it exits and restarts. Reaches Logto/Postgres by service name; tokens keep the
   # public issuer (LOGTO_ENDPOINT).

@@ -26,6 +26,9 @@ export function loadConfig({ env = process.env, sso = JSON.parse(readFileSync(ss
   const baseUrl = env.HUB_BASE_URL.replace(/\/$/, '');
   if (production && !baseUrl.startsWith('https://')) throw new ConfigError('HUB_BASE_URL must be https:// in production (NF-06)');
 
+  const allowPrivateUrls = env.HUB_ALLOW_PRIVATE_URLS === '1';
+  if (production && allowPrivateUrls) throw new ConfigError('HUB_ALLOW_PRIVATE_URLS=1 is not allowed in production (SSRF guard)');
+
   let masterKeys;
   try {
     masterKeys = parseMasterKeys(env.HUB_MASTER_KEYS);
@@ -56,6 +59,8 @@ export function loadConfig({ env = process.env, sso = JSON.parse(readFileSync(ss
     baseUrl,
     issuer: `${logto}/oidc`,
     jwksUri: `${logtoInternal}/oidc/jwks`,
+    logtoInternalOrigin: logtoInternal !== logto ? new URL(logtoInternal).origin : undefined,
+    allowPrivateUrls,
     resource: sso.hub.resource,
     databaseUrl: env.HUB_DATABASE_URL,
     masterKeys,

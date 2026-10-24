@@ -11,7 +11,7 @@ const rand = (prefix) => `${prefix}${randomBytes(12).toString('hex')}`;
 export function createMockProvider() {
   let state;
   const reset = () => {
-    state = { codes: new Map(), access: new Map(), refresh: new Map(), appPasswords: new Map(), apiKeys: new Set(), failRefresh: false, expiresIn: 3600, calls: {} };
+    state = { codes: new Map(), access: new Map(), refresh: new Map(), appPasswords: new Map(), apiKeys: new Set(), failRefresh: false, expiresIn: 3600, refreshDelayMs: 0, calls: {} };
   };
   reset();
 
@@ -42,6 +42,8 @@ export function createMockProvider() {
     expireAccessTokens: () => { for (const entry of state.access.values()) entry.expiresAt = Date.now() - 1000; },
     setFailRefresh: (value) => { state.failRefresh = value; },
     setExpiresIn: (seconds) => { state.expiresIn = seconds; },
+    // Slow refresh responses so concurrent requests really overlap (refresh-lock tests).
+    setRefreshDelay: (ms) => { state.refreshDelayMs = ms; },
     addAppPassword: (user, password) => state.appPasswords.set(user, password.replace(/\s+/g, '')),
     addApiKey: (key) => state.apiKeys.add(key),
     // A valid bearer token without an OAuth flow (for user-entered-token auth types).
@@ -87,6 +89,7 @@ export function createMockProvider() {
           return send(200, issue());
         }
         if (form.get('grant_type') === 'refresh_token') {
+          if (state.refreshDelayMs) await new Promise((resolve) => setTimeout(resolve, state.refreshDelayMs));
           const entry = state.refresh.get(form.get('refresh_token'));
           if (state.failRefresh || !entry || entry.revoked) return send(400, { error: 'invalid_grant' });
           const { refresh_token: _kept, ...tokens } = issue(form.get('refresh_token'));

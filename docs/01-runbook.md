@@ -64,6 +64,10 @@ npm run up              # compose `hub` service on :3030 (or `npm run hub` on th
 
 - **Startup refusal**: missing secrets, a non-https `HUB_BASE_URL` with `NODE_ENV=production`, or pending migrations → JSON log `startup_failed` with the reason, exit 1. The compose service restarts until fixed.
 - **Health**: `GET /health` → `{ meta, data: { status: "ok" } }` (checks the database). API document: `GET /openapi.json`; tools list: `GET /v1/manifest`.
+- **Sign-in**: `GET /login` → Logto → `/callback` (Hub UI app `hub-ui`; redirect URI `$HUB_BASE_URL/callback`); `GET /logout` ends the Logto session.
+- **Connect a provider**: OAuth connectors via `GET /connect/start?connector=<id>&label=<label>` (re-authorize: `?connectionId=<id>`); provider callback URI to register: `$HUB_BASE_URL/connect/callback`. Form connectors (WordPress) via `POST /ui-api/connections` with the `x-csrf-token` from `GET /ui-api/session`. The credential test must pass before anything is stored.
+- **SSRF guard**: user-entered URLs must be https and resolve to public addresses. `HUB_ALLOW_PRIVATE_URLS=1` (dev/test only; refused with `NODE_ENV=production`) allows http and local hosts, e.g. the mock provider.
+- **Connection states**: `active` → `needs_reauth` when a refresh is rejected (`last_error_code`); the user re-authorizes from `reconnectUrl`. Expired sessions/OAuth states are purged hourly (`expired_purged` log).
 - **Connectors**: the `started` log lists loaded `authTypes` and `connectors`. A connector without its client env logs `connector_skipped {id, missingEnv}`; an invalid definition stops startup with `startup_failed … Invalid Hub extensions` and the file + reason. Add or change one with [docs/03-hub-extensions.md](03-hub-extensions.md).
 - **Container networking**: the compose `hub` uses `postgres:5432` and fetches JWKS from `LOGTO_INTERNAL_ENDPOINT=http://logto:3001`; token `iss` stays `LOGTO_ENDPOINT`.
 - **Master keys**: back up `HUB_MASTER_KEYS` with `.env`. Losing a key version makes every record sealed with it unreadable. Rotate by adding `v2:<key>`, setting `HUB_MASTER_KEY_CURRENT=v2`, restarting the Hub, and running `npm run hub:reencrypt` (`+ <table>: N row(s)`). Remove `v1` only after a second run reports `= <table>: 0 rows` for every table.
@@ -123,6 +127,8 @@ Also back up `.env` (contains the only copy of the M2M credentials and Postgres 
 | Provision 400 `custom_profile_fields.invalid_name` | Field names must be strictly alphanumeric (`displayName`, not `display_name`). |
 | Sign-up code never arrives (dev) | Compose `mailbox` service not running (`npm run up` starts it with the `dev` profile; `docker compose ps mailbox`), or provision chose a real provider (check the `Email` step). |
 | Scripted sign-in fails with `user.suggest_mfa` | MFA policy prompts at sign-in. Skip with `POST /api/experience/profile/mfa/mfa-skipped` (handled by `scripts/lib/experience.js`). |
+| Hub log `startup_failed … Logto discovery failed` | Logto not reachable from the Hub. Compose: `LOGTO_INTERNAL_ENDPOINT=http://logto:3001` and Logto running; host: `LOGTO_ENDPOINT` reachable. The compose service retries until Logto is up. |
+| Connect redirect ends with `?connect_error=<code>` | `invalid_state` (flow expired after 10 min or replayed: start again), `provider_denied` (user declined / code exchange failed), `connection_test_failed` (provider rejected the credential), `invalid_input` (URL refused by the SSRF guard), `connector_not_available` (disabled or env missing). |
 | Hub log `startup_failed … pending migrations` | Run `npm run hub:migrate` (after `npm run hub:db:init` on a fresh volume). |
 | Hub log `startup_failed … Missing required env vars` | Set the listed vars in `.env`; `HUB_UI_*` / `HUB_WEBHOOK_SIGNING_KEY` come from `npm run provision` (`.env.apps`). |
 | `npm run hub` fails with `EADDRINUSE :3030` | The compose `hub` service is running; stop it (`docker compose stop hub`) or use it instead. |

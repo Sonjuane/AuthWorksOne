@@ -42,3 +42,12 @@ const documentedEnv = new Set([...readFileSync(new URL('.env.example', repo), 'u
 for (const entry of registry.definitions.values()) {
   connectorContract(entry, { production: entry.file.startsWith(productionDir), documentedEnv });
 }
+
+// E2E fixture connectors (mock-pointed overrides + `acme` for CN-04), loaded separately so they
+// don't replace the production definitions above.
+const fixtureRegistry = await loadRegistry({
+  authTypeDirs: dirsFromEnv(undefined, DEFAULT_AUTH_TYPE_DIRS),
+  connectorDirs: dirsFromEnv('test/fixtures/connectors', []),
+  env: new Proxy({}, { get: () => 'set' }),
+});
+for (const entry of fixtureRegistry.definitions.values()) connectorContract(entry, { production: false, documentedEnv });

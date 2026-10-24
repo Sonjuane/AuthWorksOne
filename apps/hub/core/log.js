@@ -5,10 +5,11 @@ const REDACTED = '[REDACTED]';
 
 export function createLogger({ write = (line) => process.stdout.write(`${line}\n`), base = {} } = {}) {
   const secrets = new Set();
+  const transient = new Set();
 
   const scrub = (text) => {
     let out = text;
-    for (const secret of secrets) out = out.split(secret).join(REDACTED);
+    for (const set of [secrets, transient]) for (const secret of set) out = out.split(secret).join(REDACTED);
     return out;
   };
   const redact = (value, key = '') => {
@@ -25,7 +26,14 @@ export function createLogger({ write = (line) => process.stdout.write(`${line}\n
 
   return {
     // Values shorter than 8 chars are ignored to avoid redacting common substrings.
+    // registerSecret: kept for the process lifetime (startup secrets).
+    // registerTransient: provider credentials seen per request; the oldest are dropped past 10,000.
     registerSecret: (value) => { if (typeof value === 'string' && value.length >= 8) secrets.add(value); },
+    registerTransient: (value) => {
+      if (typeof value !== 'string' || value.length < 8 || secrets.has(value)) return;
+      transient.add(value);
+      if (transient.size > 10_000) transient.delete(transient.values().next().value);
+    },
     redact,
     info: (event, fields) => emit('info', event, fields),
     warn: (event, fields) => emit('warn', event, fields),

@@ -1,0 +1,36 @@
+{
+  "$schema": "../../../apps/hub/schemas/connector.schema.json",
+  "id": "clickup",
+  "name": "ClickUp (mock)",
+  "authType": "oauth2",
+  "env": {
+    "clientId": "CLICKUP_CLIENT_ID",
+    "clientSecret": "CLICKUP_CLIENT_SECRET"
+  },
+  "settings": {
+    "authorizeUrl": "http://localhost:3097/oauth/authorize",
+    "tokenUrl": "http://mock-provider:3097/oauth/token",
+    "scopes": [
+      "read"
+    ],
+    "clientAuth": "query",
+    "refresh": {
+      "supported": false
+    }
+  },
+  "baseUrl": {
+    "fixed": "http://mock-provider:3097"
+  },
+  "test": {
+    "method": "GET",
+    "path": "/api/me",
+    "headers": {
+      "authorization": "{{accessToken}}"
+    },
+    "accountIdPath": "id"
+  },
+  "auth": {
+    "header": "Authorization",
+    "format": "{{accessToken}}"
+  }
+}

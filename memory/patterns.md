@@ -32,7 +32,10 @@ Store secrets only as `vault.seal(value, \`${tenantId}|${table}|${rowId}\`)` in 
 New connector: one JSON file in a connector directory. New auth type: one JS module default-exporting the handler, plus a fixture in `test/contract/fixtures.js`. Files starting with `_` are templates and are never loaded. Prove it with `npm run test:contract`; a handler without a fixture fails. Anti-pattern: `if (connector.id === 'x')` anywhere in `apps/hub/core/`. Express provider quirks as `settings` fields, or as a new auth type.
 
 ## Integration tests leave no trace
-Tests against the live tenant/DB create throwaway users/rows and delete them in `after()`. Append-only tables are exercised inside a transaction that is rolled back on purpose. Mutations that can't be undone (e.g. signing-key rotation) are opt-in by env flag.
+Tests against the live tenant/DB create throwaway users/rows and delete them in `after()`. Append-only tables are exercised inside a transaction that is rolled back on purpose. Mutations that can't be undone (e.g. signing-key rotation) are opt-in by env flag. Service-level tests run as tenant `itest`, so their audit rows (append-only by design) stay out of `default`. Live tests against the compose Hub delete their own session rows; their audit entries remain, as real audit events should.
+
+## Mutation-check guards before trusting a green test
+For safety properties (no refresh-token leak, single refresh under concurrency), temporarily break the guard and confirm the test fails, then restore the guard. Both the contract suite and the refresh-lock test were verified this way. The lock test only became meaningful after adding a slow-provider control.
 
 ## Shared RP helper for every internal app
 Any new internal app should consume `apps/lib/oidc.js` + `apps/lib/web.js` rather than re-implementing PKCE/session plumbing. External teams get issuer + client ID/secret and use their own certified OIDC client.

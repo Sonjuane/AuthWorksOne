@@ -40,6 +40,13 @@ Logto app IDs are generated per environment, so committed config keys apps by `k
 ## 2026-10-24 — Upgrade Logto 1.41 → 1.45 (user request)
 Image `svhd/logto:1.45` (core 1.45.0, latest stable). Ran `db alteration deploy 1.45.0` (16 alterations); pre-upgrade dump in `backup/` (git-ignored). Phase 0 probes re-ran with identical results. The AU-01 gap remains, so the §8 move stands. Supersedes "stay on 1.41" above.
 
+## 2026-10-24 — Connections and Hub login (Phase 4)
+- **SSRF default (user-approved):** provider URLs must be https and resolve to public addresses. `HUB_ALLOW_PRIVATE_URLS=1` relaxes this for dev/test and is refused in production.
+- **Hub UI login moved earlier:** it was built in Phase 4 (task 6.2) because connect flows need a signed-in user.
+- **Lock scope:** the refresh is serialized with a Postgres advisory transaction lock, and the expiry is re-checked after acquiring it. The provider call happens inside the transaction, which is acceptable at v1 scale.
+- **`needs_reauth` persists:** it's committed inside the refresh transaction, and the error is raised after commit.
+- **Integration test tenant:** service tests use tenant `itest`, so their append-only audit rows stay out of `default`.
+
 ## 2026-10-24 — Hub API and extension-point shape (Phase 3; Q3, Q4, Q12 user choice)
 - **Q3:** `POST /v1/credentials` accepts `{connectionId}` or `{connectorId}`. The connector form lets an app start first consent without knowing a connection id.
 - **Q4:** discovery is `GET /v1/manifest`, generated from `openapi.json`. There is no MCP JSON-RPC transport.
