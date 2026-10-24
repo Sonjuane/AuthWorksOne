@@ -50,6 +50,24 @@ Provision output legend: `+` created, `=` exists/updated, `-` skipped (with reas
 - **Console rule (AD-01, AD-02)**: only the owner uses the Admin Console. Never edit in the Console anything provision manages (resources, roles, apps, connectors, sign-in experience, account center, JWT customizer, hooks); provision overwrites it.
 - **Verify after changes or before a Logto upgrade**: `npm run verify:logto` and `npm run test:int`.
 
+## 4b. Connector Hub (apps/hub)
+
+First run (after §2 bootstrap and `npm run provision`, which writes `HUB_UI_*` and `HUB_WEBHOOK_SIGNING_KEY` to `.env.apps`):
+
+```sh
+# .env: HUB_DB_PASSWORD (openssl rand -hex 16), HUB_DATABASE_URL, HUB_MASTER_KEYS=v1:$(openssl rand -base64 32),
+#       HUB_MASTER_KEY_CURRENT=v1, HUB_BASE_URL — see .env.example
+npm run hub:db:init     # + role hub, + database hub (idempotent; re-syncs the role password)
+npm run hub:migrate     # + 001_init.sql … (idempotent)
+npm run up              # compose `hub` service on :3030 (or `npm run hub` on the host — not both)
+```
+
+- **Startup refusal**: missing secrets, a non-https `HUB_BASE_URL` with `NODE_ENV=production`, or pending migrations → JSON log `startup_failed` with the reason, exit 1. The compose service restarts until fixed.
+- **Health**: `GET /health` → `{ meta, data: { status: "ok" } }` (checks the database).
+- **Container networking**: the compose `hub` uses `postgres:5432` and fetches JWKS from `LOGTO_INTERNAL_ENDPOINT=http://logto:3001`; token `iss` stays `LOGTO_ENDPOINT`.
+- **Master keys**: back up `HUB_MASTER_KEYS` with `.env`. Losing a key version makes every record sealed with it unreadable. Rotate by adding `v2:<key>`, setting `HUB_MASTER_KEY_CURRENT=v2`, and running `npm run hub:reencrypt` (build plan task 3.7). Remove `v1` only after re-encrypt reports 0 rows.
+- **Backup**: `docker compose exec postgres pg_dump -U logto -Fc hub > backup/hub-$(date +%F).dump` (same restore steps as §6, database `hub`).
+
 ## 5. Rotate OIDC signing keys
 
 ```sh
@@ -104,6 +122,9 @@ Also back up `.env` (contains the only copy of the M2M credentials and Postgres 
 | Provision 400 `custom_profile_fields.invalid_name` | Field names must be strictly alphanumeric (`displayName`, not `display_name`). |
 | Sign-up code never arrives (dev) | Compose `mailbox` service not running (`npm run up` starts it with the `dev` profile; `docker compose ps mailbox`), or provision chose a real provider (check the `Email` step). |
 | Scripted sign-in fails with `user.suggest_mfa` | MFA policy prompts at sign-in. Skip with `POST /api/experience/profile/mfa/mfa-skipped` (handled by `scripts/lib/experience.js`). |
+| Hub log `startup_failed … pending migrations` | Run `npm run hub:migrate` (after `npm run hub:db:init` on a fresh volume). |
+| Hub log `startup_failed … Missing required env vars` | Set the listed vars in `.env`; `HUB_UI_*` / `HUB_WEBHOOK_SIGNING_KEY` come from `npm run provision` (`.env.apps`). |
+| `npm run hub` fails with `EADDRINUSE :3030` | The compose `hub` service is running; stop it (`docker compose stop hub`) or use it instead. |
 | `npm run verify:logto` LV-01 fails to reach the mock IdP | Logto calls the in-process mock at `host.docker.internal:3098`. Linux: add `extra_hosts: ["host.docker.internal:host-gateway"]` to the `logto` service. |
 | `/account/profile` returns Page not found | Logto 1.41 ships security/email/username/password pages only; profile + custom fields editing is covered by the profile app (`:3020`). Re-check after image upgrades. |
 | Custom claims missing from access token | Claims apply only to resource-bound JWT access tokens (request with `resource=`); the default opaque token shows claims via `userinfo` `custom_data` instead. Check Console → Custom JWT for script errors. |

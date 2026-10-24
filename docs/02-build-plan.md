@@ -73,6 +73,17 @@ The `Hub: user deleted` hook is provisioned `enabled: false` until task 5.4.
 
 ### Phase 2 — Hub foundation
 
+**Status 2026-10-24: done (2.1–2.8).** Proof:
+- `npm test` 20/20.
+- `npm run test:int` 16 passed, 1 skipped (the opt-in rotation test).
+- Compose `hub` is healthy, and `GET /health` returns 200 with the envelope.
+
+Changes from the task list:
+- The vault core (seal/open, versioned keys) moved up from 3.7 because sessions need it. Task 3.7 keeps only `hub:reencrypt`.
+- The ID-10 key-rotation test lives in `hub-foundation.test.js` and runs only with `TEST_ROTATE_KEYS=1`, because Logto drops older keys past the grace period, which isn't reversible.
+- New env `LOGTO_INTERNAL_ENDPOINT`: containers fetch the JWKS from `http://logto:3001` while checking the public issuer.
+- Postgres is published on `127.0.0.1:5432` for host-side scripts.
+
 | Task | Reqs | Files | Done check |
 |---|---|---|---|
 | 2.1 Skeleton, scripts, deps (§6) | NF-01 | `apps/hub/**`, `package.json` | `npm run hub` starts; `GET /health` 200. Test: `package.json` deps ⊆ §6 list. |
@@ -276,18 +287,18 @@ Every table has `tenant_id text NOT NULL DEFAULT 'default'` as the first column 
 | Table | Key | Columns | Notes |
 |---|---|---|---|
 | `connections` | `(tenant_id, id uuid)` | `sub`, `connector_id`, `label`, `status` (`active`\|`needs_reauth`\|`revoked`\|`error`), `base_url`, `access_expires_at`, `provider_account_id`, `last_error_code`, `created_at`, `updated_at`, `last_refreshed_at` | Index `(tenant_id, sub)`. No secrets. |
-| `connection_secrets` | `(tenant_id, connection_id)` FK → `connections` ON DELETE CASCADE | `key_version int`, `wrapped_dek bytea`, `dek_iv bytea`, `dek_tag bytea`, `iv bytea`, `ciphertext bytea`, `tag bytea` | AAD = `tenant_id|connection_id|key_version`. |
+| `connection_secrets` | `(tenant_id, connection_id)` FK → `connections` ON DELETE CASCADE | `key_version text`, `sealed bytea` | AAD = `tenant_id|connection_secrets|connection_id`. |
 | `consent_grants` | `(tenant_id, id uuid)` | `sub`, `client_id`, `connection_id` FK CASCADE, `granted_at` | Unique `(tenant_id, client_id, connection_id)`. Revoke = delete. |
-| `oauth_states` | `(tenant_id, state)` | `sub`, `connector_id`, `connection_id` (reconnect), `label`, `code_verifier` (vault-encrypted), `return_to`, `expires_at` | 10-minute TTL; deleted on use. |
-| `sessions` | `(tenant_id, sid)` | `data` (vault-encrypted JSON), `expires_at` | NF-02; Logto tokens never stored in plaintext. |
-| `audit_log` | `(tenant_id, id bigserial)` | `at`, `sub`, `client_id`, `connection_id`, `ip inet`, `user_agent`, `event_type`, `result` (`success`\|`failure`), `error_code`, `detail jsonb` | Trigger rejects UPDATE/DELETE. No FKs (outlives connections). |
-| `schema_migrations` | `version int` | `name`, `applied_at` | Runner metadata; see Q5. |
+| `oauth_states` | `(tenant_id, state_hash)` | `sub`, `connector_id`, `connection_id` (reconnect), `label`, `return_to`, `key_version`, `sealed` (PKCE verifier), `expires_at` | 10-minute TTL; deleted on use. |
+| `sessions` | `(tenant_id, sid_hash)` | `key_version`, `sealed` (session JSON), `expires_at`, `updated_at` | NF-02; `sid_hash` = sha256(cookie); Logto tokens never stored in plaintext. |
+| `audit_log` | `(tenant_id, id identity)` | `at`, `sub`, `client_id`, `connection_id`, `ip inet`, `user_agent`, `event_type`, `result` (`success`\|`failure`), `error_code`, `detail jsonb` | Triggers reject UPDATE/DELETE/TRUNCATE. No FKs (outlives connections). |
+| `schema_migrations` | `version int` | `name`, `applied_at` | Runner metadata; no `tenant_id` (Q5). |
 
 `event_type` values (AU-02): `connection.create`, `connection.refresh_failure`, `connection.delete`, `consent.grant`, `consent.revoke`, `credential.issue`, `api.reject`, `user.deleted`.
 
 Refresh lock (NF-07): `SELECT pg_advisory_xact_lock(hashtextextended(tenant_id || ':' || connection_id, 0))` inside the refresh transaction; re-read the expiry after acquiring.
 
-Vault (VA-02): `HUB_MASTER_KEYS="v1:<b64 32B>,v2:<b64 32B>"`, `HUB_MASTER_KEY_CURRENT=v2`. A per-record random DEK encrypts the credential JSON (AES-256-GCM); the KEK wraps the DEK (AES-256-GCM). `hub:reencrypt` re-wraps DEKs to the current version.
+Vault (VA-02, `apps/hub/core/vault.js`): `HUB_MASTER_KEYS="v1:<b64 32B>,v2:<b64 32B>"`, `HUB_MASTER_KEY_CURRENT=v2`. A per-record random DEK encrypts the JSON (AES-256-GCM); the KEK wraps the DEK (AES-256-GCM). Both use the row AAD. One `sealed` blob holds `[version][dekIv][dekTag][wrappedDek][iv][tag][ciphertext]`; the `key_version` column mirrors the version for re-encryption queries. `hub:reencrypt` re-seals every `sealed` row (`connection_secrets`, `oauth_states`, `sessions`) whose version isn't current.
 
 ### 3.3 Extension point interfaces (EX-03)
 
@@ -605,10 +616,10 @@ URL split: browser-facing authorize URLs use `http://localhost:3097`; container-
 | Q2 | E2E on a fresh DB needs the manual bootstrap (runbook §2: admin + M2M). Use a persistent, bootstrapped test volume, or seed the M2M app another way? | 8.1, CI |
 | Q3 | First-time consent needs a connector-level request: `POST /v1/credentials {connectorId}` (§4) vs. only `{connectionId}` as TV-05 literally states. | 5.2, S5 |
 | Q4 | Rule 05 asks for MCP discovery. The plan ships `GET /v1/manifest` (tools list); a full MCP JSON-RPC transport is not planned. OK? | 3.1 |
-| Q5 | `schema_migrations` without `tenant_id` (runner metadata) vs. NF-03 "every Hub table". | 2.3 |
+| Q5 | **Resolved 2026-10-24:** `schema_migrations` is runner metadata and has no `tenant_id`. | 2.3 |
 | Q6 | **Resolved 2026-10-24:** `roleAssignments[]` with emails from env (`OWNER_EMAILS`); the Console stays for ad-hoc assignment. | 1.12, S9 |
 | Q7 | **Resolved 2026-10-24:** `maxAttempts: 5`, `lockoutDuration: 15` (minutes). | 1.3 |
-| Q8 | UI tooling (Vite + `@vitejs/plugin-vue` + Tailwind v4) and Postgres driver (`postgres` vs `pg`). | 2.1, 6.1 |
+| Q8 | **Resolved 2026-10-24:** `postgres` (porsager, zero deps) driver; Hub UI built with Vite + `@vitejs/plugin-vue` + Tailwind v4. | 2.1, 6.1 |
 | Q9 | A `User.Deleted` webhook missed while the Hub is down leaves orphaned connections. Add reconciliation (not in spec), or accept? | 5.4, VA-08 |
 | Q10 | Provision never deletes. Retiring `profile-app` leaves its Logto app; delete it manually in the Console or add `-` removal for config-dropped apps? | 6.7, AD-02 |
 | Q11 | **Resolved 2026-10-24:** provision gives `isDefault` roles to existing users with no roles. | 1.1 |

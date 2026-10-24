@@ -40,6 +40,13 @@ Logto app IDs are generated per environment, so committed config keys apps by `k
 ## 2026-10-24 — Upgrade Logto 1.41 → 1.45 (user request)
 Image `svhd/logto:1.45` (core 1.45.0, latest stable). Ran `db alteration deploy 1.45.0` (16 alterations); pre-upgrade dump in `backup/` (git-ignored). Phase 0 probes re-ran with identical results. The AU-01 gap remains, so the §8 move stands. Supersedes "stay on 1.41" above.
 
+## 2026-10-24 — Hub foundation choices (Phase 2; Q5, Q8 user choice)
+- **Q8:** `postgres` (porsager, zero transitive deps) is the driver. The Hub UI will use Vite + `@vitejs/plugin-vue` + Tailwind v4.
+- **Q5:** `schema_migrations` has no `tenant_id` (runner metadata).
+- **Vault format:** one `sealed` bytea per row plus a `key_version` column, instead of separate IV/tag/DEK columns. It's less schema, and re-encryption is one generic query per table.
+- **Container networking:** `LOGTO_INTERNAL_ENDPOINT` for server-to-server Logto calls, keeping the public issuer. This was chosen over changing the issuer hostname, which would invalidate tokens and redirect URIs.
+- **Key-rotation test (ID-10) is opt-in** (`TEST_ROTATE_KEYS=1`). Rotating real keys can drop old ones permanently.
+
 ## 2026-10-24 — Phase 1 defaults for build-plan Q6, Q7, Q11, Q13 (user choice)
 - **Q6:** Roles are assigned by config through `roleAssignments[]`, with emails from env (`OWNER_EMAILS`), so no PII is in git. The Console stays for ad-hoc assignment.
 - **Q7:** Lockout is `sentinelPolicy {maxAttempts: 5, lockoutDuration: 15}` (minutes).

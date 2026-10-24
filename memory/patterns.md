@@ -25,5 +25,11 @@ Connector entries map config fields to env var names (`configEnv: {clientId: "GO
 ## Generated-not-authored Logto extension scripts
 The JWT-customizer script is generated from `customJwtClaims.fromCustomData` by `scripts/lib/jwt-script.js`. Anti-pattern: editing the script in the Admin Console (provision overwrites it).
 
+## Sealed rows with AAD (Hub)
+Store secrets only as `vault.seal(value, \`${tenantId}|${table}|${rowId}\`)` in a `sealed bytea` column plus `key_version`. Open with the same AAD, so a blob copied to another row fails to decrypt. Hash bearer identifiers (session IDs, OAuth state) before using them as keys. Anti-pattern: separate IV/tag/DEK columns, or plaintext tokens in any column or session.
+
+## Integration tests leave no trace
+Tests against the live tenant/DB create throwaway users/rows and delete them in `after()`. Append-only tables are exercised inside a transaction that is rolled back on purpose. Mutations that can't be undone (e.g. signing-key rotation) are opt-in by env flag.
+
 ## Shared RP helper for every internal app
 Any new internal app should consume `apps/lib/oidc.js` + `apps/lib/web.js` rather than re-implementing PKCE/session plumbing. External teams get issuer + client ID/secret and use their own certified OIDC client.

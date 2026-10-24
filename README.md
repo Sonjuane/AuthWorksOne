@@ -21,7 +21,9 @@ npm run profile                 # custom profile UI     -> http://localhost:3020
 
 Sign up at `http://localhost:3010` (verification code prints in the mailbox log; 2FA set-up is offered and can be skipped), then open `http://localhost:3020` — you are signed in without credentials (SSO).
 
-Checks: `npm test` (unit), `npm run test:int` (live tenant: provision idempotency, applied config, role claims), `npm run verify:logto` (LV-01–LV-09).
+Connector Hub (`:3030`): set the `HUB_*` values in `.env` (see `.env.example`), then `npm run hub:db:init && npm run hub:migrate`. `npm run up` runs it in compose ([docs/01-runbook.md §4b](docs/01-runbook.md)).
+
+Checks: `npm test` (unit), `npm run test:int` (live tenant + Hub database: provisioning, applied config, role claims, Hub foundation), `npm run verify:logto` (LV-01–LV-09).
 
 ## What runs where
 
@@ -33,21 +35,24 @@ Checks: `npm test` (unit), `npm run test:int` (live tenant: provision idempotenc
 | `http://localhost:3010` | Sample RP: PKCE login, ID-token/userinfo/JWT-access-token views, SSO logout |
 | `http://localhost:3020` | Custom profile UI: edits name/avatar/custom fields via the Account API |
 | `http://localhost:3099` | Dev mailbox container: JSON list of received emails (`npm run mailbox` tails it) |
+| `http://localhost:3030` | Connector Hub (`GET /health`; API and UI arrive in later build phases) |
 
 ## Repository map
 
 | Path | Contents |
 | --- | --- |
-| [docker-compose.yml](docker-compose.yml) | Logto 1.45 + PostgreSQL 17, named volume, healthchecks; `mailbox` service (profiles `dev`, `test`) |
+| [docker-compose.yml](docker-compose.yml) | Logto 1.45 + PostgreSQL 17 (127.0.0.1:5432), named volume, healthchecks; `mailbox` and `hub` services (profiles `dev`, `test`) |
+| [apps/hub/](apps/hub/) | Connector Hub: `server.js`, `core/` (config, vault, logger, auth, db, migrations runner, sessions, HTTP envelope), `migrations/`, `Dockerfile` |
 | [config/sso.config.json](config/sso.config.json) | Declarative SSO config: resources + scopes, roles, role assignments, applications (+ Hub client settings), social connectors, email provider, webhooks, sign-in experience (MFA, lockout, account linking), account center, custom profile fields, JWT claims, Hub settings |
 | [config/schemas/sso.config.schema.json](config/schemas/sso.config.schema.json) | JSON Schema for the config (editor validation + contract) |
 | [scripts/provision.js](scripts/provision.js) | Idempotent apply of the config via Management API; writes app credentials to `.env.apps` |
 | [scripts/rotate-keys.js](scripts/rotate-keys.js) | OIDC signing-key rotation + JWKS verification |
 | [scripts/dev-mailbox.js](scripts/dev-mailbox.js) | Dev-only receiver for the `http-email` fallback connector |
 | [scripts/verify-logto.js](scripts/verify-logto.js) | Live LV-01–LV-09 checks; restores the tenant |
+| [scripts/hub-db-init.js](scripts/hub-db-init.js), [scripts/hub-migrate.js](scripts/hub-migrate.js) | Hub role/database creation and migrations (idempotent) |
 | [scripts/lib/](scripts/lib/) | Management API client; JWT-customizer script generator; Experience API sign-in driver; mock OIDC IdP; TOTP |
-| [test/](test/) | `unit/` (config schema, generated scripts), `integration/` (live tenant) |
-| [apps/lib/](apps/lib/) | Shared utilities: OIDC relying-party helper (PKCE, JWKS verify, logout), minimal HTTP/session/HTML helper |
+| [test/](test/) | `unit/` (config schema, generated scripts, Hub core, repo hygiene), `integration/` (live tenant, Hub database) |
+| [apps/lib/](apps/lib/) | Shared utilities: OIDC relying-party helper (PKCE, JWKS verify, logout), access-token verifier (`jwt.js`), minimal HTTP/session/HTML helper (pluggable session store) |
 | [apps/sample-rp/server.js](apps/sample-rp/server.js) | Sample third-party app (issuer + client ID/secret only) |
 | [apps/profile-app/server.js](apps/profile-app/server.js) | Custom-branded profile editor against the Account API |
 | [docs/01-runbook.md](docs/01-runbook.md) | Operations: bootstrap, add an app, connectors, key rotation, backup/restore, secrets, production |

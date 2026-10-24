@@ -19,41 +19,71 @@ export const page = (title, body) => `<!doctype html>
   .notice{background:#ecfdf5;border:1px solid #10b981;padding:.5rem .75rem;border-radius:6px}
 </style></head><body><h1>${escapeHtml(title)}</h1>${body}</body></html>`;
 
-export function startApp({ name, port, routes }) {
+// Default session store: in memory, for the process lifetime. Any { get(sid), set(sid, data) }
+// async store can replace it (e.g. the Hub's Postgres store).
+export const memorySessionStore = () => {
   const sessions = new Map();
+  return { get: async (sid) => sessions.get(sid), set: async (sid, data) => { sessions.set(sid, data); } };
+};
+
+const readBody = (req, limit = 1_000_000) => new Promise((resolve, reject) => {
+  let data = '';
+  req.on('data', (chunk) => {
+    data += chunk;
+    if (data.length > limit) reject(Object.assign(new Error('Request body too large'), { status: 413 }));
+  });
+  req.on('end', () => resolve(data));
+  req.on('error', reject);
+});
+
+// Options: `headers` set on every response; `secureCookies` adds `Secure` to the session cookie;
+// `notFound(ctx)` / `onError(err, ctx)` replace the default HTML 404 / stack-trace 500 pages;
+// `onListen()` replaces the startup console line.
+export function startApp({ name, port, routes, sessionStore = memorySessionStore(), headers = {}, secureCookies = false, notFound, onError, onListen }) {
   const server = createServer(async (req, res) => {
+    for (const [key, value] of Object.entries(headers)) res.setHeader(key, value);
     const url = new URL(req.url, `http://localhost:${port}`);
     const cookies = Object.fromEntries(
       (req.headers.cookie ?? '').split(';').map((p) => p.trim().split('=')).filter(([k]) => k)
     );
     let sid = cookies.sid;
-    if (!sid || !sessions.has(sid)) {
+    let session = sid ? await sessionStore.get(sid) : undefined;
+    if (!session) {
       sid = randomBytes(16).toString('hex');
-      sessions.set(sid, {});
-      res.setHeader('Set-Cookie', `sid=${sid}; HttpOnly; Path=/; SameSite=Lax`);
+      session = {};
+      res.setHeader('Set-Cookie', `sid=${sid}; HttpOnly; Path=/; SameSite=Lax${secureCookies ? '; Secure' : ''}`);
     }
+    const initial = JSON.stringify(session);
+    // Session changes are saved before the response is written, so the next request sees them.
+    const send = async (status, responseHeaders, body) => {
+      if (JSON.stringify(session) !== initial) await sessionStore.set(sid, session);
+      res.writeHead(status, responseHeaders);
+      res.end(body);
+    };
     const ctx = {
       url,
-      session: sessions.get(sid),
-      redirect: (to) => { res.writeHead(302, { Location: to }); res.end(); },
-      html: (body, status = 200) => {
-        res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(body);
+      req,
+      session,
+      ip: req.socket.remoteAddress,
+      redirect: (to) => send(302, { Location: to }),
+      html: (body, status = 200) => send(status, { 'Content-Type': 'text/html; charset=utf-8' }, body),
+      json: (body, status = 200) => send(status, { 'Content-Type': 'application/json; charset=utf-8' }, JSON.stringify(body)),
+      form: async () => Object.fromEntries(new URLSearchParams(await readBody(req))),
+      body: async () => {
+        const text = await readBody(req);
+        return text ? JSON.parse(text) : {};
       },
-      form: () => new Promise((resolve) => {
-        let data = '';
-        req.on('data', (chunk) => { data += chunk; });
-        req.on('end', () => resolve(Object.fromEntries(new URLSearchParams(data))));
-      }),
     };
     const handler = routes[`${req.method} ${url.pathname}`];
-    if (!handler) return ctx.html(page('Not found', '<p>404</p>'), 404);
     try {
+      if (!handler) return await (notFound ? notFound(ctx) : ctx.html(page('Not found', '<p>404</p>'), 404));
       await handler(ctx);
     } catch (err) {
+      if (onError) return onError(err, ctx);
       console.error(err);
       ctx.html(page('Error', `<pre>${escapeHtml(err?.stack ?? err)}</pre>`), 500);
     }
   });
-  server.listen(port, () => console.log(`${name}: http://localhost:${port}`));
+  server.listen(port, onListen ?? (() => console.log(`${name}: http://localhost:${port}`)));
+  return server;
 }

@@ -12,6 +12,9 @@
     "mailbox": "docker compose logs -f mailbox",
     "rotate-keys": "node --env-file=.env scripts/rotate-keys.js",
     "verify:logto": "node --env-file=.env --env-file=.env.apps scripts/verify-logto.js",
+    "hub": "node --env-file=.env --env-file=.env.apps apps/hub/server.js",
+    "hub:db:init": "node --env-file=.env scripts/hub-db-init.js",
+    "hub:migrate": "node --env-file=.env scripts/hub-migrate.js",
     "test": "node --test test/unit/*.test.js",
     "test:int": "node --env-file=.env --env-file=.env.apps --test --test-concurrency=1 test/integration/*.test.js",
     "rp": "node --env-file=.env --env-file=.env.apps apps/sample-rp/server.js",
@@ -21,6 +24,7 @@
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "jose": "^6",
-    "openid-client": "^6"
+    "openid-client": "^6",
+    "postgres": "^3.4.9"
   }
 }

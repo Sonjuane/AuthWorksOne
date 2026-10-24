@@ -49,6 +49,12 @@ With a `Prompt*` MFA policy, `POST /api/experience/submit` for a user without MF
 ## Management-API-created users get default roles
 `POST /api/users` applies `isDefault` roles, the same as self sign-up. Only users created before a role became default lack it (provision backfills users with zero roles).
 
+## Containers can't use the public issuer URL for server-to-server calls
+`LOGTO_ENDPOINT=http://localhost:3001` is the token `iss` and the browser URL, but `localhost` inside a container is the container itself. Fetch the JWKS (and later token endpoints) via `LOGTO_INTERNAL_ENDPOINT=http://logto:3001`, while still validating `iss` against the public issuer.
+
+## Signing-key rotation can permanently drop old keys
+`POST /api/configs/oidc/private-keys/rotate` keeps only keys within `rotationGracePeriod`. Rotating when 2 keys already exist can remove the oldest one, and deleted keys can't be restored. That's why the ID-10 integration test is opt-in.
+
 ## `GET /api/logs` page size limit
 `page_size` above 100 → `400 guard.invalid_pagination`. Page with `page=N`.
 

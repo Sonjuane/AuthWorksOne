@@ -24,6 +24,9 @@ services:
       POSTGRES_DB: logto
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # Localhost only: host-side `npm run hub:db:init` / `hub:migrate` / tests.
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U logto -d logto"]
       interval: 5s
@@ -40,6 +43,34 @@ services:
       - ./scripts/dev-mailbox.js:/app/dev-mailbox.js:ro
     ports:
       - "3099:3099"
+    restart: unless-stopped
+
+  # Connector Hub. Needs `npm run provision`, `npm run hub:db:init`, `npm run hub:migrate` first;
+  # until then it exits and restarts. Reaches Logto/Postgres by service name; tokens keep the
+  # public issuer (LOGTO_ENDPOINT).
+  hub:
+    build:
+      context: .
+      dockerfile: apps/hub/Dockerfile
+    profiles: ["dev", "test"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+      - path: .env.apps
+        required: false
+    environment:
+      NODE_ENV: ${HUB_NODE_ENV:-development}
+      HUB_DATABASE_URL: postgres://hub:${HUB_DB_PASSWORD}@postgres:5432/hub
+      LOGTO_INTERNAL_ENDPOINT: http://logto:3001
+    ports:
+      - "3030:3030"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3030/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
 volumes:
