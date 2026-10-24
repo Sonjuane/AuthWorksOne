@@ -1,0 +1,14 @@
+{
+  "name": "arc-agents-md",
+  "version": "1.0.0",
+  "installedAt": "2026-07-07T13:21:07.714Z",
+  "updatedAt": "2026-07-07T13:21:07.714Z",
+  "managed": [
+    "01-development-rules.md",
+    "02-documentation-rules.md",
+    "03-developer-profile.md",
+    "04-memory-wiki.md",
+    "05-schema-first-api-design.md",
+    "06-lab-experiments.md"
+  ]
+}

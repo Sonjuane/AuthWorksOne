@@ -1,0 +1,90 @@
+{
+  "$schema": "./schemas/sso.config.schema.json",
+  "resources": [
+    { "name": "AuthWorks Sample API", "indicator": "https://api.authworks.local" }
+  ],
+  "applications": [
+    {
+      "key": "sample-rp",
+      "name": "Sample RP",
+      "type": "Traditional",
+      "baseUrl": "http://localhost:3010",
+      "port": 3010,
+      "scope": "openid profile email custom_data offline_access",
+      "resource": "https://api.authworks.local",
+      "redirectUris": ["http://localhost:3010/callback"],
+      "postLogoutRedirectUris": ["http://localhost:3010/"]
+    },
+    {
+      "key": "profile-app",
+      "name": "Profile App",
+      "type": "Traditional",
+      "baseUrl": "http://localhost:3020",
+      "port": 3020,
+      "scope": "openid profile email custom_data",
+      "redirectUris": ["http://localhost:3020/callback"],
+      "postLogoutRedirectUris": ["http://localhost:3020/"]
+    }
+  ],
+  "connectors": [
+    {
+      "connectorId": "google-universal",
+      "configEnv": { "clientId": "GOOGLE_CLIENT_ID", "clientSecret": "GOOGLE_CLIENT_SECRET" },
+      "config": { "scope": "" }
+    },
+    {
+      "connectorId": "simple-mail-transfer-protocol",
+      "configEnv": {
+        "host": "SMTP_HOST",
+        "port": "SMTP_PORT",
+        "username": "SMTP_USERNAME",
+        "password": "SMTP_PASSWORD",
+        "fromEmail": "SMTP_FROM_EMAIL"
+      },
+      "config": {
+        "templates": [
+          { "usageType": "SignIn", "subject": "AuthWorks sign-in code: {{code}}", "content": "Your sign-in code is {{code}}.", "contentType": "text/plain" },
+          { "usageType": "Register", "subject": "AuthWorks verification code: {{code}}", "content": "Your verification code is {{code}}.", "contentType": "text/plain" },
+          { "usageType": "ForgotPassword", "subject": "AuthWorks password reset code: {{code}}", "content": "Your password reset code is {{code}}.", "contentType": "text/plain" },
+          { "usageType": "Generic", "subject": "AuthWorks verification code: {{code}}", "content": "Your verification code is {{code}}.", "contentType": "text/plain" }
+        ]
+      }
+    },
+    {
+      "connectorId": "http-email",
+      "devFallback": true,
+      "config": { "endpoint": "http://host.docker.internal:3099/email" }
+    }
+  ],
+  "signInExperience": {
+    "color": { "primaryColor": "#4F46E5", "isDarkModeEnabled": true, "darkPrimaryColor": "#818CF8" },
+    "branding": { "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCAyMDAgNDgiPjxyZWN0IHg9IjQiIHk9IjgiIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgcng9IjgiIGZpbGw9IiM0RjQ2RTUiLz48dGV4dCB4PSIyMCIgeT0iMzEiIGZvbnQtZmFtaWx5PSJBcmlhbCxIZWx2ZXRpY2Esc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZmZmZiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QTwvdGV4dD48dGV4dCB4PSI0NiIgeT0iMzAiIGZvbnQtZmFtaWx5PSJBcmlhbCxIZWx2ZXRpY2Esc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCIgZm9udC13ZWlnaHQ9IjYwMCIgZmlsbD0iIzExMTgyNyI+QXV0aFdvcmtzPC90ZXh0Pjwvc3ZnPg==", "darkLogoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCAyMDAgNDgiPjxyZWN0IHg9IjQiIHk9IjgiIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgcng9IjgiIGZpbGw9IiM4MThDRjgiLz48dGV4dCB4PSIyMCIgeT0iMzEiIGZvbnQtZmFtaWx5PSJBcmlhbCxIZWx2ZXRpY2Esc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iIzExMTgyNyIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QTwvdGV4dD48dGV4dCB4PSI0NiIgeT0iMzAiIGZvbnQtZmFtaWx5PSJBcmlhbCxIZWx2ZXRpY2Esc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCIgZm9udC13ZWlnaHQ9IjYwMCIgZmlsbD0iI0Y5RkFGQiI+QXV0aFdvcmtzPC90ZXh0Pjwvc3ZnPg==", "favicon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0Ij48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHJ4PSIxNCIgZmlsbD0iIzRGNDZFNSIvPjx0ZXh0IHg9IjMyIiB5PSI0NiIgZm9udC1mYW1pbHk9IkFyaWFsLEhlbHZldGljYSxzYW5zLXNlcmlmIiBmb250LXNpemU9IjQyIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5BPC90ZXh0Pjwvc3ZnPg==" },
+    "customCss": "/* AuthWorks white-label — hosted sign-in page. Console -> Sign-in experience -> Custom CSS. */\nbody { font-family: 'Inter', system-ui, -apple-system, sans-serif; }\n",
+    "signInMode": "SignInAndRegister",
+    "signUp": { "identifiers": ["email"], "password": true, "verify": true },
+    "signIn": {
+      "methods": [
+        { "identifier": "email", "password": true, "verificationCode": false, "isPasswordPrimary": true }
+      ]
+    },
+    "socialSignInConnectorTargets": ["google"]
+  },
+  "accountCenter": {
+    "enabled": true,
+    "fields": {
+      "name": "Edit",
+      "avatar": "Edit",
+      "username": "Edit",
+      "email": "Edit",
+      "password": "Edit",
+      "social": "Edit",
+      "customData": "Edit",
+      "profile": "Edit"
+    }
+  },
+  "customProfileFields": [
+    { "name": "displayName", "type": "Text", "label": "Display name", "description": "Shown to other users across AuthWorks apps", "required": true },
+    { "name": "jobTitle", "type": "Text", "label": "Job title", "required": false }
+  ],
+  "customJwtClaims": { "fromCustomData": ["displayName", "jobTitle"] }
+}

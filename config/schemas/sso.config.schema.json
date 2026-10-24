@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "sso.config.schema.json",
+  "title": "AuthWorksOne SSO configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["applications", "signInExperience", "accountCenter"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "indicator"],
+        "properties": {
+          "name": { "type": "string" },
+          "indicator": { "type": "string", "format": "uri" }
+        }
+      }
+    },
+    "applications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "name", "type", "redirectUris", "postLogoutRedirectUris"],
+        "properties": {
+          "key": { "type": "string", "pattern": "^[a-z0-9-]+$", "description": "Stable key; SCREAMING_SNAKE prefix of the env vars written to .env.apps" },
+          "name": { "type": "string" },
+          "type": { "enum": ["Traditional", "SPA", "Native", "MachineToMachine"] },
+          "baseUrl": { "type": "string", "format": "uri", "description": "Local dev server origin for the bundled sample apps" },
+          "port": { "type": "integer" },
+          "scope": { "type": "string", "description": "Space-separated OIDC scopes the app requests" },
+          "resource": { "type": "string", "format": "uri", "description": "API resource indicator the app requests JWT access tokens for" },
+          "redirectUris": { "type": "array", "items": { "type": "string", "format": "uri" }, "minItems": 1 },
+          "postLogoutRedirectUris": { "type": "array", "items": { "type": "string", "format": "uri" } }
+        }
+      }
+    },
+    "connectors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["connectorId"],
+        "properties": {
+          "connectorId": { "type": "string", "description": "Logto connector factory id" },
+          "configEnv": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "connector config field -> env var name; connector is skipped when any env var is empty"
+          },
+          "config": { "type": "object", "description": "Static (non-secret) connector config merged over configEnv values" },
+          "devFallback": { "type": "boolean", "description": "Applied only while no other connector of the same type exists; removed once one does" }
+        }
+      }
+    },
+    "signInExperience": {
+      "type": "object",
+      "description": "Body for PATCH /api/sign-in-exp; socialSignInConnectorTargets is filtered to connectors that exist on the server. Empty branding.* URLs are dropped before PATCH.",
+      "properties": {
+        "branding": {
+          "type": "object",
+          "description": "White-label assets. Each URL is applied only when non-empty; use a hosted asset URL or a data: URI.",
+          "properties": {
+            "logoUrl": { "type": "string", "description": "Logo shown in light mode" },
+            "darkLogoUrl": { "type": "string", "description": "Logo shown in dark mode" },
+            "favicon": { "type": "string", "description": "Favicon for the hosted sign-in page" }
+          }
+        },
+        "customCss": { "type": "string", "description": "Raw CSS injected into the hosted sign-in page" }
+      }
+    },
+    "accountCenter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "fields"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "fields": {
+          "type": "object",
+          "additionalProperties": { "enum": ["Off", "ReadOnly", "Edit"] }
+        }
+      }
+    },
+    "customProfileFields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "type", "label"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[A-Za-z0-9]+$", "description": "customData key (Logto: letters/numbers only); also the claim name when listed in customJwtClaims" },
+          "type": { "enum": ["Text", "Number", "Date", "Checkbox", "Select", "Url", "Regex"] },
+          "label": { "type": "string" },
+          "description": { "type": "string" },
+          "required": { "type": "boolean", "default": false }
+        }
+      }
+    },
+    "customJwtClaims": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fromCustomData": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "customData keys copied into JWT access-token claims by the generated customizer script"
+        }
+      }
+    }
+  }
+}

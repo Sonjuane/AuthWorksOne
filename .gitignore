@@ -1,0 +1,5 @@
+.env
+.env.apps
+node_modules/
+.gstack/
+node-compile-cache/
