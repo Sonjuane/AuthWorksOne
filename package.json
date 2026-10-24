@@ -9,6 +9,7 @@
     "provision": "node --env-file=.env scripts/provision.js",
     "mailbox": "node scripts/dev-mailbox.js",
     "rotate-keys": "node --env-file=.env scripts/rotate-keys.js",
+    "verify:logto": "node --env-file=.env --env-file=.env.apps scripts/verify-logto.js",
     "rp": "node --env-file=.env --env-file=.env.apps apps/sample-rp/server.js",
     "profile": "node --env-file=.env --env-file=.env.apps apps/profile-app/server.js"
   },

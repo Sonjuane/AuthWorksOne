@@ -22,7 +22,7 @@ Run 2026-10-23 on 1.41.0 and re-run 2026-10-24 on 1.45.0 (identical results) wit
 | LV-08 | PASS | `sub`, `client_id`, `scope`, `aud` native; `roles` via JWT customizer `context.user.roles` | ID-07, HA-02, HA-03 |
 | LV-09 | PASS (http-email) / **PENDING (SES)** | `http-email` Register + ForgotPassword delivered; reset needs `forgotPasswordMethods` | EM-01 SES path **conditional** on task 0.3 |
 
-No Logto upgrade is required. Remaining Phase 0 work: tasks 0.2 and 0.3.
+No Logto upgrade is required. Remaining Phase 0 work: task 0.3.
 
 ---
 
@@ -35,8 +35,8 @@ Legend: **Reqs** = spec IDs satisfied; **S#** = spec §7.2 acceptance scenario.
 | Task | Reqs | Files | Done check |
 |---|---|---|---|
 | 0.1 Record LV results | LV-01…09 | `memory/gotchas.md`, `memory/decisions.md`, spec §8 | **Done** (table above) |
-| 0.2 Re-runnable verifier: port the Phase 0 probes; snapshot → probe → restore; mock OIDC IdP in-process | LV-01…09 | `scripts/verify-logto.js` (new), `package.json` (`verify:logto`) | `npm run verify:logto` prints `PASS LV-0n` ×9 (LV-09 SES `SKIP` without AWS env), exit 0. Before/after `GET` snapshots of sign-in-exp, account-center, and apps are equal. Required before any image upgrade. |
-| 0.3 SES live send | LV-09, EM-01 | none (env only) | With `AWS_SES_*` set, `npm run verify:logto -- --only LV-09 --email ses` delivers to a verified SES recipient. Until then, EM-01 SES is conditional. |
+| 0.2 Re-runnable verifier: port the Phase 0 probes; snapshot → probe → restore; mock OIDC IdP in-process | LV-01…09 | `scripts/verify-logto.js`, `scripts/lib/{experience,mock-oidc,totp}.js`, `package.json` (`verify:logto`), `.env.example` | **Done** 2026-10-24 on 1.45.0: `PASS` ×9 (LV-09 SES `skip`), exit 0, tenant unchanged. Run it before any image upgrade; `-- --only LV-02,LV-09` runs a subset. |
+| 0.3 SES live send | LV-09, EM-01 | none (env only) | With `AWS_SES_*` and `SES_TEST_RECIPIENT` set, `npm run verify:logto -- --only LV-09` reports `ses: test email sent` and the message arrives. Until then, EM-01 SES is conditional. |
 
 ### Phase 1 — Logto config-as-code (Deliverable 1)
 

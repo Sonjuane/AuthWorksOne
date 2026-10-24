@@ -2,10 +2,13 @@
 type: pattern-registry
 title: Patterns & Anti-Patterns
 description: Reusable patterns and anti-patterns established in this codebase.
-last_updated: 2026-07-07
+last_updated: 2026-10-24
 ---
 
 # Patterns
+
+## Scripted sign-ins through the Experience API
+`scripts/lib/experience.js` drives Logto the way the hosted sign-in page does: cookie-jar browser, PKCE authorize, password/MFA/social steps, code exchange, Account API calls. `scripts/lib/mock-oidc.js` is an in-process OIDC IdP for generic-connector tests. Reuse both in verification and tests; don't hand-roll interaction flows. `scripts/verify-logto.js` is the reference consumer: per-check snapshot → run → restore + deferred cleanup, then a final tenant-drift check.
 
 ## Idempotent provisioner with `+ / = / -` logging
 Every section of `scripts/provision.js` GETs current state, then POSTs (create) or PATCHes (update), logging `+` created, `=` exists/updated, `-` skipped with reason. Re-running is always safe. New tenant config belongs in `sso.config.json` + a provision section, never in ad-hoc scripts.

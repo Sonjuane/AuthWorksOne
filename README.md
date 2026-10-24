@@ -58,6 +58,7 @@ Sign up at `http://localhost:3010` (verification code prints in the mailbox term
 - **Enable Google Workspace login**: set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in `.env` → `npm run provision` ([docs/01-runbook.md §4](docs/01-runbook.md)).
 - **Enable real email (SMTP)**: set `SMTP_*` in `.env` → `npm run provision`; the dev `http-email` fallback connector is removed automatically.
 - **Rotate signing keys**: `npm run rotate-keys` ([docs/01-runbook.md §5](docs/01-runbook.md)).
+- **Verify Logto features (before any image upgrade)**: `npm run verify:logto` (needs `.env.apps` from provision). It runs the LV-01–LV-09 checks live and restores the tenant afterwards; any `FAIL` or `tenant CHANGED` blocks the upgrade.
 - **Backup / restore**: [docs/01-runbook.md §6](docs/01-runbook.md).
 
 ## Verification checklist
