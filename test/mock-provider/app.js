@@ -6,6 +6,13 @@ import { createServer } from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
 
 const CLIENT = { id: 'mock-client', secret: 'mock-secret' };
+// Record lists at real provider paths (HubSpot, ClickUp, Google Drive), so the reference client
+// app makes the same calls against the mock as against the real providers.
+const RECORDS = {
+  'GET /crm/v3/objects/contacts': { results: [{ id: '101', properties: { email: 'contact@example.com' } }] },
+  'GET /team': { teams: [{ id: '9001', name: 'Mock workspace' }] },
+  'GET /drive/v3/files': { files: [{ id: 'file-1', name: 'Mock document' }] },
+};
 const rand = (prefix) => `${prefix}${randomBytes(12).toString('hex')}`;
 
 export function createMockProvider() {
@@ -116,6 +123,7 @@ export function createMockProvider() {
       case 'GET /wp-json/wp/v2/posts':
         return basicUser(req.headers.authorization) ? send(200, [{ id: 1, title: { rendered: 'Hello world' } }]) : send(401, { code: 'rest_not_logged_in' });
       default:
+        if (RECORDS[route]) return bearerValid(req.headers.authorization) ? send(200, RECORDS[route]) : send(401, { error: 'invalid_token' });
         return send(404, { error: 'not_found' });
     }
   };

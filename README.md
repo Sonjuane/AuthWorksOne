@@ -15,14 +15,15 @@ Wait until `http://localhost:3001/oidc/.well-known/openid-configuration` returns
 ```sh
 npm run provision               # applies config/sso.config.json to Logto (idempotent)
 npm run mailbox                 # dev-only: tails the mailbox container (sign-up verification codes)
-npm run rp                      # sample relying party  -> http://localhost:3010
+npm run rp                      # reference client app  -> http://localhost:3010
+npm run rp:second               # second client app (HubSpot only) -> http://localhost:3011
 ```
 
 Connector Hub (`:3030`): set the `HUB_*` values in `.env` (see `.env.example`), then `npm run hub:db:init && npm run hub:migrate`. `npm run up` builds and runs it in compose, UI included ([docs/01-runbook.md §4b](docs/01-runbook.md)).
 
 Sign up at `http://localhost:3010` (verification code prints in the mailbox log; 2FA set-up is offered and can be skipped), then open `http://localhost:3030` — you are signed in to the Hub without credentials (SSO).
 
-Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only), `npm run test:int` (live tenant + Hub database: provisioning, applied config, role claims, Hub foundation), `npm run verify:logto` (LV-01–LV-09).
+Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only), `npm run test:int` (live tenant + Hub database: provisioning, applied config, role claims, Hub foundation, reference app S5/S6, internal-API pattern; stop `npm run rp`/`rp:second` first), `npm run verify:logto` (LV-01–LV-09).
 
 ## What runs where
 
@@ -31,7 +32,8 @@ Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only
 | `http://localhost:3001/oidc` | OIDC issuer (discovery, authorize, token, userinfo, JWKS) |
 | `http://localhost:3001/account` | Prebuilt account center (email, username, password) |
 | `http://localhost:3002` | Logto Admin Console |
-| `http://localhost:3010` | Sample RP: PKCE login, ID-token/userinfo/JWT-access-token views, SSO logout |
+| `http://localhost:3010` | Reference client app (Sample RP): PKCE login, roles/permissions, Hub connections (`/connections`, `/record`: consent, credentials, one record per connector), ID-token/userinfo/JWT views, SSO logout |
+| `http://localhost:3011` | Second client app (same server, `APP_KEY=second-client`): own consent per connection (S6) |
 | `http://localhost:3099` | Dev mailbox container: JSON list of received emails (`npm run mailbox` tails it) |
 | `http://localhost:3030` | Connector Hub UI (Connections, App access, Account, Admin, consent page) + app API `/v1/connections`, `/v1/credentials`; `/ui-api/*`, `/webhooks/logto`, `/health`, `/openapi.json` |
 | `http://localhost:3097` | Mock provider (compose profile `test`): OAuth 2.0 + APIs + `/_control/*` |
@@ -52,7 +54,7 @@ Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only
 | [scripts/lib/](scripts/lib/) | Management API client; JWT-customizer script generator; Experience API sign-in driver; mock OIDC IdP; TOTP |
 | [test/](test/) | `unit/` (config schema, generated scripts, Hub core + registry + OpenAPI, repo hygiene), `contract/` (EX-06 suites), `integration/` (live tenant, Hub database), `mock-provider/` (mock OAuth/API provider), `fixtures/` |
 | [apps/lib/](apps/lib/) | Shared utilities: OIDC relying-party helper (PKCE, JWKS verify, logout), access-token verifier (`jwt.js`), minimal HTTP/session/HTML helper (pluggable session store) |
-| [apps/sample-rp/server.js](apps/sample-rp/server.js) | Sample third-party app (issuer + client ID/secret only) |
+| [apps/sample-rp/server.js](apps/sample-rp/server.js) | Reference client app (issuer + client ID/secret only; Hub API client); `APP_KEY` selects the config app |
 | [docs/01-runbook.md](docs/01-runbook.md) | Operations: bootstrap, add an app, connectors, key rotation, backup/restore, secrets, production |
 | [docs/03-hub-extensions.md](docs/03-hub-extensions.md) | Authoring guide: add a Hub connector or auth type; contract suites |
 | [docs/02-build-plan.md](docs/02-build-plan.md) | Build plan for the Logto extensions + Connector Hub: Phase 0 results, phases/tasks, traceability matrix, Hub design, API outline, config changes, test plan, open questions |

@@ -97,6 +97,12 @@ Only security/email/username/password pages exist; the docs describe a newer ver
 ## Opaque vs JWT access tokens
 No `resource` in the request → opaque token (works for `userinfo` and Account API). With `resource` → JWT for that audience only. To hold both, request `offline_access` (+ `prompt=consent`) and mint the resource JWT via refresh grant.
 
+## Several APIs: repeat `resource` at authorize
+Logto accepts several `resource` params in one authorization request. A refresh grant with `resource=<one of them>` then returns a JWT for that audience, with only that resource's role-granted scopes. Every resource scope must also be in the authorize `scope` (e.g. `read:sample connections:read connections:token`). `apps/lib/oidc.js` takes `resource` as a list.
+
+## The Hub reads client IDs only at startup
+`applications[].hub` keys resolve to `<KEY>_CLIENT_ID` from `.env.apps` when the Hub starts (`skippedClients` otherwise). After provisioning a new Hub caller, recreate the compose Hub (`--force-recreate hub`; `env_file` changes need a recreate, not a restart), or the app gets `client_not_registered`.
+
 ## openid-client v6 refuses plain-HTTP issuers
 Local `http://localhost:3001/oidc` needs `client.allowInsecureRequests` in the discovery `execute` option — handled in `apps/lib/oidc.js`, applied only when the issuer starts with `http://`.
 

@@ -191,6 +191,17 @@ Retiring the profile app (6.7): `apps/profile-app` is removed. **Owner action:**
 
 ### Phase 7 — Reference client app + internal apps
 
+**Status 2026-10-24: done (7.1–7.3).** Proof:
+- `npm test` 102/102; `npm run test:int` 56 passed, 1 skipped (opt-in); `verify:logto` 9/9.
+- `reference-app.test.js` runs both RP processes against a test Hub (:3995) and the in-process mock. It covers the roles view, S5 (HubSpot via `connectorId`, WordPress via `connectionId`), S6, and the `reconnectUrl` redirect. Mutation check: dropping the provider auth header fails S5.
+- `internal-api.test.js` records every outbound request; only Logto's JWKS appears (no Hub call).
+
+How it's built:
+- **Record paths:** the app uses real provider record paths (HubSpot contacts, ClickUp `/team`, Drive files, WP posts), and the mock provider serves the same paths (user choice).
+- **Resources:** an app with a `hub` block requests `hub.resource` as a second `resource` at login. `createOidc({resource})` accepts a list.
+- **Second client:** `second-client` is no longer test-only, so `npm run rp:second` works in dev (user choice).
+- **Scopes:** `sample-rp` scope adds `read:sample connections:read connections:token`; `second-client` adds `connections:read connections:token`.
+
 | Task | Reqs | Files | Done check |
 |---|---|---|---|
 | 7.1 `sample-rp` → reference app: roles view, list consented connections, request credentials, follow `consentUrl`, fetch one record per connector with returned token + `baseUrl`. Key and name stay `sample-rp` / "Sample RP" (provision matches by name) | Deliverable 3, ID-07, TV-04, TV-05 | `apps/sample-rp/server.js`, `apps/lib/oidc.js` (`resourceToken(session, resource?)`) | S5. |
@@ -524,7 +535,7 @@ Behavior rules:
     { "key": "hub-ui", "name": "Connector Hub", "type": "Traditional", "baseUrl": "http://localhost:3030", "port": 3030,
       "scope": "openid profile email custom_data offline_access", "resource": "https://hub.authworks.local",
       "redirectUris": ["http://localhost:3030/callback"], "postLogoutRedirectUris": ["http://localhost:3030/"] },
-    { "key": "second-client", "name": "Second Client", "type": "Traditional", "profiles": ["test"], "hub": { "allowedConnectors": ["hubspot"], "consentReturnUris": ["http://localhost:3011/connections"] } }
+    { "key": "second-client", "name": "Second Client", "type": "Traditional", "hub": { "allowedConnectors": ["hubspot"], "consentReturnUris": ["http://localhost:3011/connections"] } }
   ],
   "connectors": [
     { "connectorId": "github-universal", "configEnv": { "clientId": "GITHUB_CLIENT_ID", "clientSecret": "GITHUB_CLIENT_SECRET" } },

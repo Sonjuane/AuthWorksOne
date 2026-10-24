@@ -5,7 +5,10 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 // `internalOrigin` (e.g. http://logto:3001): server-to-server calls go there, while URLs handed
 // to the browser (authorize, end-session) keep the public issuer origin.
+// `resource` is one indicator or a list; all are requested at login, and resourceToken() mints a
+// JWT for any of them (default: the first).
 export async function createOidc({ issuer, clientId, clientSecret, baseUrl, scope, resource, internalOrigin }) {
+  const resources = [resource ?? []].flat();
   const publicOrigin = new URL(issuer).origin;
   const swap = (url, from, to) => (from && to && String(url).startsWith(from) ? `${to}${String(url).slice(from.length)}` : String(url));
   const toInternal = (url) => swap(url, publicOrigin, internalOrigin);
@@ -21,7 +24,7 @@ export async function createOidc({ issuer, clientId, clientSecret, baseUrl, scop
     async loginUrl(session) {
       const codeVerifier = client.randomPKCECodeVerifier();
       session.oidc = { codeVerifier, state: client.randomState(), nonce: client.randomNonce() };
-      return toPublic(client.buildAuthorizationUrl(config, {
+      const url = client.buildAuthorizationUrl(config, {
         redirect_uri: redirectUri,
         scope,
         state: session.oidc.state,
@@ -29,8 +32,9 @@ export async function createOidc({ issuer, clientId, clientSecret, baseUrl, scop
         code_challenge: await client.calculatePKCECodeChallenge(codeVerifier),
         code_challenge_method: 'S256',
         ...(scope.includes('offline_access') ? { prompt: 'consent' } : {}),
-        ...(resource ? { resource } : {}),
-      }).href);
+      });
+      for (const indicator of resources) url.searchParams.append('resource', indicator);
+      return toPublic(url.href);
     },
 
     // Exchanges the code (PKCE + state + nonce enforced); ID token signature is
@@ -65,12 +69,12 @@ export async function createOidc({ issuer, clientId, clientSecret, baseUrl, scop
     },
 
     // JWT access token for an API resource via refresh grant, verified against JWKS.
-    async resourceToken(session) {
-      const tokens = await client.refreshTokenGrant(config, session.tokens.refresh_token, { resource });
+    async resourceToken(session, audience = resources[0]) {
+      const tokens = await client.refreshTokenGrant(config, session.tokens.refresh_token, { resource: audience });
       session.tokens.refresh_token = tokens.refresh_token ?? session.tokens.refresh_token;
       const { protectedHeader, payload } = await jwtVerify(tokens.access_token, jwks, {
         issuer: config.serverMetadata().issuer,
-        audience: resource,
+        audience,
       });
       return { accessToken: tokens.access_token, protectedHeader, payload };
     },

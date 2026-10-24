@@ -39,3 +39,8 @@ For safety properties (no refresh-token leak, single refresh under concurrency),
 
 ## Shared RP helper for every internal app
 Any new internal app should consume `apps/lib/oidc.js` + `apps/lib/web.js` rather than re-implementing PKCE/session plumbing. External teams get issuer + client ID/secret and use their own certified OIDC client.
+- **Hub API callers** copy `apps/sample-rp/server.js`. The Hub JWT is cached until a minute before expiry. Error envelopes with `consentUrl`/`reconnectUrl` become redirects. The provider header is built from `auth.format`, and the secret is never rendered.
+- **APIs that need no Hub** verify tokens with `apps/lib/jwt.js` and authorize from `roles`/`scope`. See `test/integration/internal-api.test.js`.
+
+## Mock provider serves real provider paths
+Client-side calls (record fetches) use real provider paths. The mock (`test/mock-provider/app.js` `RECORDS`) answers the same paths, so app code has no mock branch. Add a path there when a client app needs a new provider endpoint.

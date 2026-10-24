@@ -30,6 +30,7 @@ Required once per fresh database, before `npm run provision` works.
 2. `npm run provision` — creates or updates the app and writes `<KEY>_CLIENT_ID` / `<KEY>_CLIENT_SECRET` to `.env.apps`. `SSO_PROFILE=test npm run provision` also applies `profiles: ["test"]` entries.
 3. Hand the app team: issuer URL (`$LOGTO_ENDPOINT/oidc`), client ID, client secret. They need nothing else — discovery supplies all endpoints. Require PKCE + `state`/`nonce` in their client.
 4. Scopes: `openid profile email` baseline; add `custom_data` for mapped profile fields, `offline_access` (+ `prompt=consent`) for refresh tokens, `resource=<indicator>` for JWT access tokens.
+5. Hub callers: also request `resource=https://hub.authworks.local` (repeat `resource` for several APIs) and scopes `connections:read connections:token`. Mint the Hub JWT via refresh grant with that `resource`. On `consent_required` / `connection_reauth_required`, redirect the user to `consentUrl` / `reconnectUrl`. Reference implementation: `apps/sample-rp/server.js`. After provision, recreate the Hub (`docker compose --profile dev up -d --force-recreate hub`). It resolves client IDs from `.env.apps` only at startup; until then the app gets `client_not_registered`.
 
 Provision output legend: `+` created, `=` exists/updated, `-` skipped (with reason). Re-running is safe.
 

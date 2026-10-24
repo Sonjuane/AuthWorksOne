@@ -40,6 +40,12 @@ Logto app IDs are generated per environment, so committed config keys apps by `k
 ## 2026-10-24 — Upgrade Logto 1.41 → 1.45 (user request)
 Image `svhd/logto:1.45` (core 1.45.0, latest stable). Ran `db alteration deploy 1.45.0` (16 alterations); pre-upgrade dump in `backup/` (git-ignored). Phase 0 probes re-ran with identical results. The AU-01 gap remains, so the §8 move stands. Supersedes "stay on 1.41" above.
 
+## 2026-10-24 — Reference client app (Phase 7; user choices)
+- **Record paths:** the reference app fetches one record at each provider's real path (HubSpot `/crm/v3/objects/contacts?limit=1`, ClickUp `/team`, Drive `/drive/v3/files?pageSize=1`, WP `/wp/v2/posts?per_page=1`). The mock provider serves the same paths, so app code is identical for mock and real. This was chosen over an env-overridable path map.
+- **`second-client` is always provisioned:** its `profiles: ["test"]` tag is dropped, so `npm run rp:second` works in dev. This was chosen over `SSO_PROFILE=test` on the dev tenant, which would also add the mock login buttons, and over a throwaway app per test run.
+- **Verification before Playwright:** a live integration test (`reference-app.test.js`) proves S5/S6 by running both RP processes against a test Hub. The consent click is a service call; the Hub consent page has its own tests.
+- **Hub resource at login:** an app with a `hub` block requests `hub.resource` as an extra `resource`. The Hub resource scopes (`connections:read connections:token`) go in the app's `scope`.
+
 ## 2026-10-24 — Provision stays add/update-only (Q10 user choice a)
 Retiring an app from `config/sso.config.json` doesn't delete it in Logto. The owner deletes it once in the Admin Console (first case: "Profile App" after build plan task 6.7). This was chosen because a pruning provisioner could delete a working app after a config mistake. **Possible later:** opt-in pruning of config-dropped apps, limited to apps provision created, with a dry-run preview (build plan Q10).
 

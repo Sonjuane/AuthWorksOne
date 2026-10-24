@@ -22,7 +22,8 @@
     "test": "node --test test/unit/*.test.js test/contract/*.test.js",
     "test:contract": "node --test test/contract/*.test.js",
     "test:int": "node --env-file=.env --env-file=.env.apps --test --test-concurrency=1 test/integration/*.test.js",
-    "rp": "node --env-file=.env --env-file=.env.apps apps/sample-rp/server.js"
+    "rp": "node --env-file=.env --env-file=.env.apps apps/sample-rp/server.js",
+    "rp:second": "APP_KEY=second-client node --env-file=.env --env-file=.env.apps apps/sample-rp/server.js"
   },
   "dependencies": {
     "ajv": "^8.20.0",
