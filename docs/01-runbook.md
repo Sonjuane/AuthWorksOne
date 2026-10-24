@@ -148,3 +148,22 @@ Also back up `.env` (contains the only copy of the M2M credentials and Postgres 
 | Hub UI shows JSON `not_found` instead of the app | UI not built: `npm run hub:ui:build` (host) or rebuild the image (`docker compose up -d --build hub`). The Hub logs `ui_not_built` at startup. |
 | Custom claims missing from access token | Claims apply only to resource-bound JWT access tokens (request with `resource=`); the default opaque token shows claims via `userinfo` `custom_data` instead. Check Console → Custom JWT for script errors. |
 | M2M token 401 | `LOGTO_M2M_CLIENT_*` wrong or the app lost the **Logto Management API access** role (Console → Applications → Provisioner → Roles). |
+
+## 9. E2E test stack (Playwright)
+
+Own compose project `authworks-test` (own volume, `.env.test` + generated `.env.test.apps`, overlay `docker-compose.test.yml`). Same ports as dev: run one stack at a time.
+
+One-time setup:
+1. `npm run down` (stops dev; its data stays in its own volume).
+2. Create `.env.test`: copy `.env`, blank `LOGTO_M2M_CLIENT_ID` / `LOGTO_M2M_CLIENT_SECRET`, add `SSO_PROFILE=test`, `ENV_APPS_FILE=.env.test.apps`, `COMPOSE_SUBNET=172.31.241.0/24`. Leave real email/social provider vars empty (codes must go to the mailbox).
+3. `npm run e2e:up`, then bootstrap the test tenant exactly as §2, writing the M2M credentials into `.env.test`.
+
+Each run: `npm run down && npm run e2e:up && npm run test:e2e`, then `npm run e2e:down && npm run up`.
+
+`npm run test:e2e` global setup: checks that the test stack is running, runs `hub:db:init`, `hub:migrate` and provision against `.env.test`, rebuilds and recreates `hub`, `sample-rp` and `second-client`, and resets the mock. Teardown runs the S12/S13/S14/S16 scans, prints one line per scan, then deletes every `e2e-*` user. Any scan hit fails the run. Failure traces are written to `test-results/`; open them with `npx playwright show-trace`.
+
+| Symptom | Fix |
+| --- | --- |
+| `authworks-test stack is not running` | `npm run down && npm run e2e:up` (the dev stack holds the same ports). |
+| Provision `Missing env var: LOGTO_M2M_CLIENT_ID` | Test tenant not bootstrapped, or `.env.test` not saved: step 3 above. |
+| App signs out after visiting another local app | Session cookies must be per-app (`sid_<port>`, `apps/lib/web.js`); browsers share cookies across ports. |

@@ -249,9 +249,11 @@ if (config.hooks?.length) {
   }
 }
 
-writeFileSync(new URL('../.env.apps', import.meta.url), envLines.join('\n') + '\n');
+// ENV_APPS_FILE: repo-relative output (the E2E stack uses .env.test.apps).
+const appsFile = process.env.ENV_APPS_FILE ?? '.env.apps';
+writeFileSync(new URL(`../${appsFile}`, import.meta.url), envLines.join('\n') + '\n');
 step('Generated credentials');
-log('= wrote .env.apps');
+log(`= wrote ${appsFile}`);
 
 // --- Account center (profile self-service) ---
 step('Account center');

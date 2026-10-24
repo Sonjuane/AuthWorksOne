@@ -38,20 +38,21 @@ const readBody = (req, limit = 1_000_000) => new Promise((resolve, reject) => {
 
 // Options: `headers` set on every response; `secureCookies` adds `Secure` to the session cookie;
 // `notFound(ctx)` / `onError(err, ctx)` replace the default HTML 404 / stack-trace 500 pages;
-// `onListen()` replaces the startup console line.
-export function startApp({ name, port, routes, sessionStore = memorySessionStore(), headers = {}, secureCookies = false, notFound, onError, onListen }) {
+// `onListen()` replaces the startup console line. `cookieName` defaults to `sid_<port>`: browsers
+// share cookies across ports, so apps on one host (localhost:3010, :3030) need distinct names.
+export function startApp({ name, port, routes, sessionStore = memorySessionStore(), headers = {}, secureCookies = false, cookieName = `sid_${port}`, notFound, onError, onListen }) {
   const server = createServer(async (req, res) => {
     for (const [key, value] of Object.entries(headers)) res.setHeader(key, value);
     const url = new URL(req.url, `http://localhost:${port}`);
     const cookies = Object.fromEntries(
       (req.headers.cookie ?? '').split(';').map((p) => p.trim().split('=')).filter(([k]) => k)
     );
-    let sid = cookies.sid;
+    let sid = cookies[cookieName];
     let session = sid ? await sessionStore.get(sid) : undefined;
     if (!session) {
       sid = randomBytes(16).toString('hex');
       session = {};
-      res.setHeader('Set-Cookie', `sid=${sid}; HttpOnly; Path=/; SameSite=Lax${secureCookies ? '; Secure' : ''}`);
+      res.setHeader('Set-Cookie', `${cookieName}=${sid}; HttpOnly; Path=/; SameSite=Lax${secureCookies ? '; Secure' : ''}`);
     }
     const initial = JSON.stringify(session);
     // Session changes are saved before the response is written, so the next request sees them.

@@ -8,6 +8,8 @@
   "scripts": {
     "up": "docker compose --profile dev up -d",
     "down": "docker compose --profile dev down",
+    "e2e:up": "docker compose -p authworks-test -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test --profile test up -d --build",
+    "e2e:down": "docker compose -p authworks-test -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test --profile test down",
     "provision": "node --env-file=.env scripts/provision.js",
     "mailbox": "docker compose logs -f mailbox",
     "rotate-keys": "node --env-file=.env scripts/rotate-keys.js",
@@ -22,6 +24,8 @@
     "test": "node --test test/unit/*.test.js test/contract/*.test.js",
     "test:contract": "node --test test/contract/*.test.js",
     "test:int": "node --env-file=.env --env-file=.env.apps --test --test-concurrency=1 test/integration/*.test.js",
+    "test:e2e": "playwright test",
+    "test:smoke": "node --env-file-if-exists=.env --test test/smoke/*.smoke.js",
     "rp": "node --env-file=.env --env-file=.env.apps apps/sample-rp/server.js",
     "rp:second": "APP_KEY=second-client node --env-file=.env --env-file=.env.apps apps/sample-rp/server.js"
   },
@@ -33,6 +37,7 @@
     "postgres": "^3.4.9"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-vue": "^6.0.10",
     "tailwindcss": "^4.3.3",

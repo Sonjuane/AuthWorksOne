@@ -5,3 +5,8 @@ node_modules/
 node-compile-cache/
 backup/
 apps/hub/ui/dist/
+.env.test
+.env.test.apps
+test/e2e/.runtime/
+test-results/
+playwright-report/

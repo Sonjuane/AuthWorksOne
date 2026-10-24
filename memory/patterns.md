@@ -42,5 +42,11 @@ Any new internal app should consume `apps/lib/oidc.js` + `apps/lib/web.js` rathe
 - **Hub API callers** copy `apps/sample-rp/server.js`. The Hub JWT is cached until a minute before expiry. Error envelopes with `consentUrl`/`reconnectUrl` become redirects. The provider header is built from `auth.format`, and the secret is never rendered.
 - **APIs that need no Hub** verify tokens with `apps/lib/jwt.js` and authorize from `roles`/`scope`. See `test/integration/internal-api.test.js`.
 
+## E2E: page objects, run ledger, scans at teardown
+- **Selectors:** Logto hosted-page selectors live only in `test/e2e/pages/logto.js`, and `logto.finish()` walks the follow-up prompts (profile, MFA prompt/verify, backup codes). Hub UI flows live in `test/e2e/pages/hub.js`.
+- **Ledger:** specs never assert leaks themselves. They append to `test/e2e/.runtime/ledger.jsonl`: `record('secret' | 'response', …)` and `expectAudit({event, sub, clientId, errorCode})`. `global-teardown.js` runs S12/S13/S14/S16 over the whole run, then deletes `e2e-*` users.
+- **Users:** specs create users with the Management API (`newUser`). Only S1/S2/S18 sign up through the UI.
+- **Leftover probes:** probe scripts belong in the git-ignored `test/e2e/.runtime/`; delete probe users afterwards.
+
 ## Mock provider serves real provider paths
 Client-side calls (record fetches) use real provider paths. The mock (`test/mock-provider/app.js` `RECORDS`) answers the same paths, so app code has no mock branch. Add a path there when a client app needs a new provider endpoint.

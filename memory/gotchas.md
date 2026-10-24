@@ -100,6 +100,16 @@ No `resource` in the request → opaque token (works for `userinfo` and Account 
 ## Several APIs: repeat `resource` at authorize
 Logto accepts several `resource` params in one authorization request. A refresh grant with `resource=<one of them>` then returns a JWT for that audience, with only that resource's role-granted scopes. Every resource scope must also be in the authorize `scope` (e.g. `read:sample connections:read connections:token`). `apps/lib/oidc.js` takes `resource` as a list.
 
+## Browsers share cookies across ports
+`localhost:3010`, `:3011` and `:3030` share one cookie jar (cookies ignore the port). With one cookie name, signing in to one app overwrote the others' sessions (the reference app lost its session after the Hub UI was used). `startApp` now names the cookie `sid_<port>` (`cookieName` option). Scripted tests never caught it, because they give each app its own cookie jar. Only a real browser (Playwright) did.
+
+## Logto hosted-page behavior (1.45, found writing E2E)
+- After a password reset (**Save password**), Logto returns to the sign-in page; it does not sign the user in. Navigating away right after the click aborts the save.
+- A user with TOTP but no backup codes gets the backup-code page (`/mfa-binding/BackupCode`) after TOTP verification.
+- Account Center has no "remove TOTP" button. ID-04 removal is the 2-step toggle → **Disable** → password re-check. The stored factors remain, but sign-in stops asking.
+- Management API user search needs explicit wildcards: `search.primaryEmail=e2e-%25&mode.primaryEmail=like`. A bare `search=e2e-` matches nothing.
+- The Hub SPA redirects to `/login` client-side after load. Wait for the signed-in nav or the Logto form, not for a URL.
+
 ## The Hub reads client IDs only at startup
 `applications[].hub` keys resolve to `<KEY>_CLIENT_ID` from `.env.apps` when the Hub starts (`skippedClients` otherwise). After provisioning a new Hub caller, recreate the compose Hub (`--force-recreate hub`; `env_file` changes need a recreate, not a restart), or the app gets `client_not_registered`.
 

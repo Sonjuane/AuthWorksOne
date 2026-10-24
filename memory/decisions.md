@@ -40,6 +40,14 @@ Logto app IDs are generated per environment, so committed config keys apps by `k
 ## 2026-10-24 — Upgrade Logto 1.41 → 1.45 (user request)
 Image `svhd/logto:1.45` (core 1.45.0, latest stable). Ran `db alteration deploy 1.45.0` (16 alterations); pre-upgrade dump in `backup/` (git-ignored). Phase 0 probes re-ran with identical results. The AU-01 gap remains, so the §8 move stands. Supersedes "stay on 1.41" above.
 
+## 2026-10-24 — E2E suite shape (Phase 8; user choices)
+- **Same ports, one stack at a time:** `authworks-test` reuses the dev ports because app URLs are fixed in config. Stop dev (`npm run down`) before `npm run e2e:up`. Rejected: offset ports, which need per-environment app URLs.
+- **Test-only wiring lives in an overlay:** `docker-compose.test.yml` overrides the Hub's `env_file` (`!override`) to `.env.test` / `.env.test.apps`, mounts the mock connector fixtures plus an S17 drop directory, and adds the reference app and second client as compose services. They run in compose because the mock's `baseUrl` (`http://mock-provider:3097`) resolves only on the compose network. Provision writes to `ENV_APPS_FILE`.
+- **S17 / S18:** S17 drops a connector JSON into a mounted directory, restarts the Hub, and connects it in the UI. S18 checks that the config-declared test-profile mock login connectors appear and sign a user in; no runtime config edit. A runtime S18 (config overlay + provision, then removal) was rejected as more moving parts.
+- **Bootstrap:** the user asked Claude to drive the test-tenant bootstrap. Playwright created the Console admin, then used the Console's own Management API token to create the M2M app with its role.
+- **Scans are teardown-only:** specs feed a run ledger; Logto and mailbox logs are excluded from S13 (third-party; the mailbox prints codes by design).
+- **S10 expired token:** the E2E check sends a real token with an altered `exp`, which fails the signature check. Genuine expiry stays covered by the unit tests, because Logto can't mint an already-expired token.
+
 ## 2026-10-24 — E2E uses a persistent, hand-bootstrapped test stack (Q2 user choice)
 Playwright (Phase 8) runs against a separate compose project and volume (e.g. `authworks-test`), bootstrapped once by hand like dev (admin + M2M; Logto OSS can't script it). Tests clean up after themselves. It's simple and upgrade-safe, and it's isolated from the dev tenant (mock login connectors stay out of dev). Rejected options: a scripted SQL seed into Logto's tables (couples to its internal schema), snapshot restore (the dump must be regenerated after each upgrade), and reusing the dev tenant. Trade-off: CI can't start from an empty DB.
 

@@ -1,0 +1,6 @@
+{
+  "hubspot": "/crm/v3/objects/contacts?limit=1",
+  "clickup": "/team",
+  "google": "/drive/v3/files?pageSize=1",
+  "wordpress": "/wp/v2/posts?per_page=1"
+}

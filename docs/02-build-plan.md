@@ -210,6 +210,20 @@ How it's built:
 
 ### Phase 8 — Acceptance
 
+**Status 2026-10-24: done (8.1–8.4).** Proof:
+- `npm run test:e2e`: 20/20 against the `authworks-test` stack, in about 1 minute. That's 18 scenario specs (S1–S11, S15, S17, S18) plus password reset, 2FA removal, admin and mobile.
+- **Teardown scans:** S12 DB 0 hits; S13 logs 0 hits; S14 194 responses, 0 hits; S16 19 expected audit events, all present.
+- **Scan mutation check:** one injected leak per scan made all four fail.
+- `npm test` 102/102; `npm run test:int` 56 passed, 1 skipped; `verify:logto` 9/9; `npm run test:smoke` 4 skipped (no `SMOKE_*` env).
+
+How it's built:
+- **Test stack:** own compose project and volume, same ports as dev (Q2, user choices); see runbook §9. `docker-compose.test.yml` adds the reference app and second client as compose services, because the mock's `baseUrl` resolves only inside compose.
+- **Mock login IdP:** the mock provider gained the `/oidc/*` login IdP (HTML form; ES256 via `node:crypto`).
+- **Bug found by E2E:** every app used session cookie `sid` on `localhost`, so apps on different ports overwrote each other's sessions. `apps/lib/web.js` now names it `sid_<port>`.
+- **S10:** the expired-token case uses a real token with an altered `exp` (signature failure); true expiry is unit-tested.
+- **S17 / S18:** S17 drops a connector file and restarts the Hub. S18 uses the config-declared test-profile login connectors.
+- **Smoke tests:** they reuse the connector's own credential test plus the reference app's record path (`apps/sample-rp/record-paths.json`).
+
 | Task | Reqs | Files | Done check |
 |---|---|---|---|
 | 8.1 Playwright suite S1–S18 + extra specs (password reset, 2FA removal, admin, mobile) | §7.2 | `test/e2e/**`, `playwright.config.js` | `npm run test:e2e` green against `docker compose --profile test`. |
@@ -642,7 +656,7 @@ Not added: HTTP framework (Node `http` + `apps/lib/web.js`), YAML parser (OpenAP
 
 - Global setup: wait for health checks → `npm run hub:db:init && npm run hub:migrate` → `SSO_PROFILE=test npm run provision` → reset the mock and mailbox.
 - Email codes: poll `GET http://localhost:3099/`, filter messages whose JSON `body` has `to === <test email>` and `type ∈ {Register, SignIn, ForgotPassword, Generic}`, and read `payload.code`. The format was verified in Phase 0 (LV-09), so no mailbox changes are needed.
-- TOTP: read the secret text from the Logto MFA binding page and compute codes with the shared `test/lib/totp.js` (RFC 6238, `node:crypto`).
+- TOTP: read the secret text from the Logto MFA binding page and compute codes with the shared `scripts/lib/totp.js` (RFC 6238, `node:crypto`).
 - Unique emails per test (`e2e-<spec>-<ts>@example.com`); teardown deletes test users through the Management API.
 - Pin the Logto image; keep hosted-page selectors in `test/e2e/pages/logto.js` (one place to fix after an upgrade).
 

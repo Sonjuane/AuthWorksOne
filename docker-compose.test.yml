@@ -1,0 +1,53 @@
+# E2E test stack overlay (Phase 8). Own compose project (`authworks-test`, own pgdata volume),
+# env from .env.test / .env.test.apps; same ports as dev, so run one stack at a time.
+# Up/down: npm run e2e:up / npm run e2e:down. Bootstrap once: docs/01-runbook.md §9.
+services:
+  hub:
+    env_file: !override
+      - .env.test
+      - path: .env.test.apps
+        required: false
+    environment:
+      # Mock-pointed connector fixtures; S17 drops new definitions into the .runtime dir.
+      HUB_CONNECTOR_DIRS: apps/hub/connectors,test/fixtures/connectors,test/e2e/.runtime/connectors
+      HUB_ALLOW_PRIVATE_URLS: "1"
+      HUBSPOT_CLIENT_ID: mock-client
+      HUBSPOT_CLIENT_SECRET: mock-secret
+      CLICKUP_CLIENT_ID: mock-client
+      CLICKUP_CLIENT_SECRET: mock-secret
+      HUB_GOOGLE_CLIENT_ID: mock-client
+      HUB_GOOGLE_CLIENT_SECRET: mock-secret
+      ACME_CLIENT_ID: mock-client
+      ACME_CLIENT_SECRET: mock-secret
+    volumes:
+      - ./test/fixtures/connectors:/app/test/fixtures/connectors:ro
+      - ./test/e2e/.runtime/connectors:/app/test/e2e/.runtime/connectors:ro
+
+  # Reference client app and second client (S3, S5, S6, S8); in compose so they reach the mock
+  # provider's container-internal baseUrl (http://mock-provider:3097).
+  sample-rp: &rp
+    image: node:24-alpine
+    profiles: ["test"]
+    working_dir: /app
+    command: ["node", "apps/sample-rp/server.js"]
+    volumes:
+      - ./:/app:ro
+    env_file:
+      - .env.test
+      - path: .env.test.apps
+        required: false
+    environment:
+      LOGTO_INTERNAL_ENDPOINT: http://logto:3001
+      HUB_URL: http://hub:3030
+    ports:
+      - "3010:3010"
+    restart: unless-stopped
+
+  second-client:
+    <<: *rp
+    environment:
+      LOGTO_INTERNAL_ENDPOINT: http://logto:3001
+      HUB_URL: http://hub:3030
+      APP_KEY: second-client
+    ports:
+      - "3011:3011"

@@ -12,7 +12,9 @@ const appKey = process.env.APP_KEY ?? 'sample-rp';
 const app = config.applications.find((a) => a.key === appKey);
 const envPrefix = appKey.replace(/-/g, '_').toUpperCase();
 const logtoEndpoint = process.env.LOGTO_ENDPOINT.replace(/\/$/, '');
-const hubUrl = (process.env.HUB_URL ?? config.applications.find((a) => a.key === 'hub-ui').baseUrl).replace(/\/$/, '');
+// Browser links use the Hub's public URL; API calls may use an internal one (HUB_URL in compose).
+const hubPublicUrl = config.applications.find((a) => a.key === 'hub-ui').baseUrl;
+const hubUrl = (process.env.HUB_URL ?? hubPublicUrl).replace(/\/$/, '');
 const hubResource = app.hub ? config.hub.resource : undefined;
 
 const oidc = await createOidc({
@@ -22,15 +24,12 @@ const oidc = await createOidc({
   baseUrl: app.baseUrl,
   scope: app.scope,
   resource: [...new Set([app.resource, hubResource].filter(Boolean))],
+  internalOrigin: process.env.LOGTO_INTERNAL_ENDPOINT,
 });
 
-// One record per connector, at the real provider path (the test mock provider serves the same paths).
-const RECORD_PATHS = {
-  hubspot: '/crm/v3/objects/contacts?limit=1',
-  clickup: '/team',
-  google: '/drive/v3/files?pageSize=1',
-  wordpress: '/wp/v2/posts?per_page=1',
-};
+// One record per connector, at the real provider path (the test mock provider serves the same paths;
+// the live smoke tests reuse them).
+const RECORD_PATHS = JSON.parse(readFileSync(new URL('./record-paths.json', import.meta.url)));
 
 const json = (value) => `<pre>${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
 const back = (to = '/', label = 'Back') => `<a class="button" href="${to}">${label}</a>`;
@@ -90,7 +89,7 @@ startApp({
         </p>
         <p>
           <a class="button secondary" href="${escapeHtml(logtoEndpoint)}/account">Account center</a>
-          <a class="button secondary" href="${escapeHtml(hubUrl)}/account">Hub account</a>
+          <a class="button secondary" href="${escapeHtml(hubPublicUrl)}/account">Hub account</a>
           <a class="button secondary" href="/logout">SSO logout</a>
         </p>`));
     },

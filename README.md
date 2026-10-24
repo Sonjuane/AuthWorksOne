@@ -23,7 +23,9 @@ Connector Hub (`:3030`): set the `HUB_*` values in `.env` (see `.env.example`), 
 
 Sign up at `http://localhost:3010` (verification code prints in the mailbox log; 2FA set-up is offered and can be skipped), then open `http://localhost:3030` — you are signed in to the Hub without credentials (SSO).
 
-Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only), `npm run test:int` (live tenant + Hub database: provisioning, applied config, role claims, Hub foundation, reference app S5/S6, internal-API pattern; stop `npm run rp`/`rp:second` first), `npm run verify:logto` (LV-01–LV-09).
+Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only), `npm run test:int` (live tenant + Hub database: provisioning, applied config, role claims, Hub foundation, reference app S5/S6, internal-API pattern; stop `npm run rp`/`rp:second` first), `npm run verify:logto` (LV-01–LV-09), `npm run test:smoke` (live provider checks; skip without `SMOKE_*` env).
+
+E2E (Playwright, S1–S18 + scans): separate test stack, same ports as dev. One-time setup in [docs/01-runbook.md §9](docs/01-runbook.md); then `npm run down && npm run e2e:up && npm run test:e2e`, and `npm run e2e:down && npm run up` to return to dev.
 
 ## What runs where
 
@@ -36,13 +38,15 @@ Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only
 | `http://localhost:3011` | Second client app (same server, `APP_KEY=second-client`): own consent per connection (S6) |
 | `http://localhost:3099` | Dev mailbox container: JSON list of received emails (`npm run mailbox` tails it) |
 | `http://localhost:3030` | Connector Hub UI (Connections, App access, Account, Admin, consent page) + app API `/v1/connections`, `/v1/credentials`; `/ui-api/*`, `/webhooks/logto`, `/health`, `/openapi.json` |
-| `http://localhost:3097` | Mock provider (compose profile `test`): OAuth 2.0 + APIs + `/_control/*` |
+| `http://localhost:3097` | Mock provider (compose profile `test`): OAuth 2.0 + APIs (incl. real record paths) + login IdP `/oidc/*` (mock Google/GitHub) + `/_control/*` |
 
 ## Repository map
 
 | Path | Contents |
 | --- | --- |
 | [docker-compose.yml](docker-compose.yml) | Logto 1.45 + PostgreSQL 17 (127.0.0.1:5432), named volume, healthchecks; `mailbox` and `hub` services (profiles `dev`, `test`) |
+| [docker-compose.test.yml](docker-compose.test.yml) | E2E overlay (project `authworks-test`): Hub on `.env.test`, mock connector fixtures, reference app + second client as services |
+| [playwright.config.js](playwright.config.js) | Playwright config (one worker; env from `.env.test` / `.env.test.apps`) |
 | [apps/hub/](apps/hub/) | Connector Hub: `server.js`, `openapi.json` (API source of truth), `core/` (config, vault, sealed tables, connections, audit, SSRF-guarded HTTP, logger, auth, security, registry, extension helpers, manifest, db, migrations, sessions, HTTP envelope), `routes/` (login, connect, UI API, app API, webhooks), `ui/` (Vue 3 + Tailwind source; `npm run hub:ui:build` → `ui/dist`), `auth-types/` + `connectors/` (extension points), `schemas/`, `migrations/`, `Dockerfile` |
 | [config/sso.config.json](config/sso.config.json) | Declarative SSO config: resources + scopes, roles, role assignments, applications (+ Hub client settings), social connectors, email provider, webhooks, sign-in experience (MFA, lockout, account linking), account center, custom profile fields, JWT claims, Hub settings |
 | [config/schemas/sso.config.schema.json](config/schemas/sso.config.schema.json) | JSON Schema for the config (editor validation + contract) |
@@ -52,7 +56,7 @@ Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only
 | [scripts/verify-logto.js](scripts/verify-logto.js) | Live LV-01–LV-09 checks; restores the tenant |
 | [scripts/hub-db-init.js](scripts/hub-db-init.js), [scripts/hub-migrate.js](scripts/hub-migrate.js), [scripts/hub-reencrypt.js](scripts/hub-reencrypt.js), [scripts/hub-reconcile.js](scripts/hub-reconcile.js) | Hub role/database creation, migrations, master-key re-encryption, deleted-user reconciliation |
 | [scripts/lib/](scripts/lib/) | Management API client; JWT-customizer script generator; Experience API sign-in driver; mock OIDC IdP; TOTP |
-| [test/](test/) | `unit/` (config schema, generated scripts, Hub core + registry + OpenAPI, repo hygiene), `contract/` (EX-06 suites), `integration/` (live tenant, Hub database), `mock-provider/` (mock OAuth/API provider), `fixtures/` |
+| [test/](test/) | `unit/` (config schema, generated scripts, Hub core + registry + OpenAPI, repo hygiene), `contract/` (EX-06 suites), `integration/` (live tenant, Hub database), `e2e/` (Playwright specs, `pages/` hosted-page + Hub page objects, global setup/teardown scans), `smoke/` (live per-connector checks), `lib/` (leak scans), `mock-provider/` (mock OAuth/API provider + login IdP), `fixtures/` |
 | [apps/lib/](apps/lib/) | Shared utilities: OIDC relying-party helper (PKCE, JWKS verify, logout), access-token verifier (`jwt.js`), minimal HTTP/session/HTML helper (pluggable session store) |
 | [apps/sample-rp/server.js](apps/sample-rp/server.js) | Reference client app (issuer + client ID/secret only; Hub API client); `APP_KEY` selects the config app |
 | [docs/01-runbook.md](docs/01-runbook.md) | Operations: bootstrap, add an app, connectors, key rotation, backup/restore, secrets, production |

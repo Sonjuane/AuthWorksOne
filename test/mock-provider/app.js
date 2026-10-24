@@ -2,8 +2,10 @@
 // refresh, revoke), bearer/API-key/Basic-auth resource APIs (incl. WordPress shape), and
 // controls to expire tokens or fail refreshes. Tokens are prefixed mock_at_ / mock_rt_ so log
 // and DB scans can find them. startMockProvider() runs it in-process on an ephemeral port.
+// Also a login IdP under /oidc for Logto's generic OIDC connectors (mock-google / mock-github).
+// node:crypto only: the compose service runs without node_modules.
 import { createServer } from 'node:http';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
 
 const CLIENT = { id: 'mock-client', secret: 'mock-secret' };
 // Record lists at real provider paths (HubSpot, ClickUp, Google Drive), so the reference client
@@ -15,10 +17,27 @@ const RECORDS = {
 };
 const rand = (prefix) => `${prefix}${randomBytes(12).toString('hex')}`;
 
+// Login IdP: an HTML form picks the email and whether it is verified (S2, S18). ES256 ID tokens;
+// `sub` is stable per (client_id, email), so each mock provider is a distinct identity.
+const idKeys = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+const jwk = { ...idKeys.publicKey.export({ format: 'jwk' }), kid: 'mock', alg: 'ES256', use: 'sig' };
+const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+const signIdToken = (claims) => {
+  const input = `${b64({ alg: 'ES256', kid: 'mock', typ: 'JWT' })}.${b64(claims)}`;
+  return `${input}.${sign('sha256', Buffer.from(input), { key: idKeys.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url')}`;
+};
+const attr = (value) => String(value ?? '').replace(/[&"<>]/g, (c) => `&#${c.charCodeAt(0)};`);
+const loginForm = (params) => `<!doctype html><html><head><meta charset="utf-8"><title>Mock sign-in (${attr(params.get('client_id'))})</title></head>
+<body><h1>Mock sign-in: ${attr(params.get('client_id'))}</h1><form method="post">
+${['redirect_uri', 'state', 'nonce', 'client_id'].map((k) => `<input type="hidden" name="${k}" value="${attr(params.get(k))}">`).join('')}
+<label>Email <input name="email" type="email" required></label>
+<label><input name="verified" type="checkbox" checked> Email verified</label>
+<button type="submit">Sign in</button></form></body></html>`;
+
 export function createMockProvider() {
   let state;
   const reset = () => {
-    state = { codes: new Map(), access: new Map(), refresh: new Map(), appPasswords: new Map(), apiKeys: new Set(), failRefresh: false, expiresIn: 3600, refreshDelayMs: 0, calls: {} };
+    state = { codes: new Map(), idCodes: new Map(), access: new Map(), refresh: new Map(), appPasswords: new Map(), apiKeys: new Set(), failRefresh: false, expiresIn: 3600, refreshDelayMs: 0, calls: {} };
   };
   reset();
 
@@ -72,6 +91,31 @@ export function createMockProvider() {
     };
 
     switch (route) {
+      case 'GET /oidc/authorize':
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        return res.end(loginForm(url.searchParams));
+      case 'POST /oidc/authorize': {
+        const code = rand('mock_idc_');
+        state.idCodes.set(code, { email: form.get('email'), verified: form.has('verified'), nonce: form.get('nonce'), aud: form.get('client_id') });
+        const to = new URL(form.get('redirect_uri'));
+        to.searchParams.set('code', code);
+        to.searchParams.set('state', form.get('state'));
+        return send(302, undefined, { location: to.href });
+      }
+      case 'POST /oidc/token': {
+        const grant = state.idCodes.get(form.get('code'));
+        state.idCodes.delete(form.get('code'));
+        if (!grant) return send(400, { error: 'invalid_grant' });
+        const now = Math.floor(Date.now() / 1000);
+        const sub = createHash('sha256').update(`${grant.aud}:${grant.email}`).digest('hex').slice(0, 24);
+        const idToken = signIdToken({
+          iss: `http://${req.headers.host}/oidc`, aud: grant.aud, sub, email: grant.email, email_verified: grant.verified,
+          ...(grant.nonce ? { nonce: grant.nonce } : {}), iat: now, exp: now + 300,
+        });
+        return send(200, { access_token: rand('mock_idat_'), token_type: 'Bearer', expires_in: 300, id_token: idToken });
+      }
+      case 'GET /oidc/jwks':
+        return send(200, { keys: [jwk] });
       case 'GET /oauth/authorize': {
         const to = new URL(url.searchParams.get('redirect_uri'));
         const code = rand('mock_code_');
