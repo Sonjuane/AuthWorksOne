@@ -174,7 +174,7 @@ Changes and findings:
 | 6.4 Connections (add, relabel, reconnect, delete, status), App access (grants + revoke), Consent page | UI-02, UI-03, UI-04, TV-02, TV-03 | `apps/hub/ui/src/views/{Connections,AppAccess,Consent}.vue` | S4, S5, S8. |
 | 6.5 Hub admin (`owner`/`admin` from the `roles` claim): connector status, client settings (read-only), audit list with filters | UI-05, AU-04 | `apps/hub/ui/src/views/Admin*.vue`, `ui-api.js` | E2E: admin sees views and filters by user/event/client/date; `user` role → 403. |
 | 6.6 CSP, HSTS (https), `frame-ancestors 'none'`, CSRF double-submit on state-changing UI calls | NF-06 | `apps/hub/core/security.js` | Integration: headers present; POST without CSRF token → 403. |
-| 6.7 Retire `apps/profile-app` | §5, UI-01 | delete `apps/profile-app/`; config entry; `package.json` `profile`; README; runbook | `npm run profile` gone; README map updated; see Q10 for the orphaned Logto app. |
+| 6.7 Retire `apps/profile-app` | §5, UI-01 | delete `apps/profile-app/`; config entry; `package.json` `profile`; README; runbook | `npm run profile` gone; README map updated; runbook tells the owner to delete "Profile App" in Console → Applications (Q10 option a). |
 
 ### Phase 7 — Reference client app + internal apps
 
@@ -658,7 +658,7 @@ URL split: browser-facing authorize URLs use `http://localhost:3097`; container-
 | Q7 | **Resolved 2026-10-24:** `maxAttempts: 5`, `lockoutDuration: 15` (minutes). | 1.3 |
 | Q8 | **Resolved 2026-10-24:** `postgres` (porsager, zero deps) driver; Hub UI built with Vite + `@vitejs/plugin-vue` + Tailwind v4. | 2.1, 6.1 |
 | Q9 | **Resolved 2026-10-24 (option A):** `npm run hub:reconcile` (operator command, provisioner M2M credentials; the Hub holds no Logto admin rights). Has `--dry-run`, and refuses an empty Logto list or more than 20% missing users without `--force`. | 5.4, VA-08 |
-| Q10 | Provision never deletes. Retiring `profile-app` leaves its Logto app; delete it manually in the Console or add `-` removal for config-dropped apps? | 6.7, AD-02 |
+| Q10 | **Resolved 2026-10-24 (option a):** provision stays add/update-only. After task 6.7, the owner deletes the "Profile App" application once in the Admin Console (runbook step in 6.7). **Possible later improvement (option b):** provision prunes Logto apps that were dropped from config, logged with `-`. Safeguards: only apps provision created (e.g. a marker in `customData`), a `--dry-run` preview, and an explicit opt-in flag. | 6.7, AD-02 |
 | Q11 | **Resolved 2026-10-24:** provision gives `isDefault` roles to existing users with no roles. | 1.1 |
 | Q12 | **Resolved 2026-10-24:** TV-05 response adds `authType` and `auth`; errors add `invalid_token`, `insufficient_scope`, `provider_unavailable`, plus `invalid_request`, `not_found`, `internal_error`. | 3.1, 5.2 |
 | Q13 | **Resolved 2026-10-24:** TTL-gated rotation satisfies ID-09. | 1.6 |

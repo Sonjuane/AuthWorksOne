@@ -40,6 +40,9 @@ Logto app IDs are generated per environment, so committed config keys apps by `k
 ## 2026-10-24 — Upgrade Logto 1.41 → 1.45 (user request)
 Image `svhd/logto:1.45` (core 1.45.0, latest stable). Ran `db alteration deploy 1.45.0` (16 alterations); pre-upgrade dump in `backup/` (git-ignored). Phase 0 probes re-ran with identical results. The AU-01 gap remains, so the §8 move stands. Supersedes "stay on 1.41" above.
 
+## 2026-10-24 — Provision stays add/update-only (Q10 user choice a)
+Retiring an app from `config/sso.config.json` doesn't delete it in Logto. The owner deletes it once in the Admin Console (first case: "Profile App" after build plan task 6.7). This was chosen because a pruning provisioner could delete a working app after a config mistake. **Possible later:** opt-in pruning of config-dropped apps, limited to apps provision created, with a dry-run preview (build plan Q10).
+
 ## 2026-10-24 — Consent, app API, deletion (Phase 5; Q9 user choice A)
 - **Q9: reconciliation is an operator command** (`npm run hub:reconcile`) using the provisioner's Management API credentials. The Hub never holds Logto admin rights, because OSS Management API access is all-or-nothing. Safety rails: `--dry-run`; abort on an empty Logto list or more than 20% missing unless `--force`.
 - **Webhook reachability:** the compose network subnet is pinned, and Logto's `SSRF_ALLOWED_ADDRESSES` is set to exactly that subnet. This was chosen over `SSRF_PROTECTION_DISABLED` or allowing all private ranges.
