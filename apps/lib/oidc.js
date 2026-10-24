@@ -46,12 +46,23 @@ export async function createOidc({ issuer, clientId, clientSecret, baseUrl, scop
         access_token: tokens.access_token,
         id_token: tokens.id_token,
         refresh_token: tokens.refresh_token,
+        expires_at: Date.now() + (tokens.expiresIn() ?? 3600) * 1000,
       };
       session.claims = tokens.claims();
       delete session.oidc;
     },
 
     userinfo: (session) => client.fetchUserInfo(config, session.tokens.access_token, session.claims.sub),
+
+    // Opaque access token (userinfo / Account API), refreshed when it expires within a minute.
+    async accessToken(session) {
+      if (session.tokens.expires_at && session.tokens.expires_at - Date.now() > 60_000) return session.tokens.access_token;
+      const tokens = await client.refreshTokenGrant(config, session.tokens.refresh_token);
+      session.tokens.access_token = tokens.access_token;
+      session.tokens.refresh_token = tokens.refresh_token ?? session.tokens.refresh_token;
+      session.tokens.expires_at = Date.now() + (tokens.expiresIn() ?? 3600) * 1000;
+      return session.tokens.access_token;
+    },
 
     // JWT access token for an API resource via refresh grant, verified against JWKS.
     async resourceToken(session) {

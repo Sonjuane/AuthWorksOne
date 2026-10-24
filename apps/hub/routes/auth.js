@@ -12,7 +12,9 @@ export const authRoutes = ({ oidc, baseUrl }) => ({
     // openid-client derives redirect_uri from this URL, so use the public base, not the bind address.
     await oidc.handleCallback(ctx.session, `${baseUrl}${ctx.url.pathname}${ctx.url.search}`);
     const { sub, email, name } = ctx.session.claims;
-    ctx.session.user = { sub, email, name };
+    // Global roles (ID-07) from a Hub-resource JWT; they gate the admin views (UI-05).
+    const { payload } = await oidc.resourceToken(ctx.session);
+    ctx.session.user = { sub, email, name, roles: payload.roles ?? [] };
     ctx.session.csrf = newCsrfToken();
     const returnTo = ctx.session.returnTo ?? '/';
     delete ctx.session.returnTo;

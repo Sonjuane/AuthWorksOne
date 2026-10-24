@@ -86,6 +86,61 @@ test('connectors list and the SSRF guard on a private WordPress URL (R3)', { ski
   assert.match(redirect.location, /connect_error=invalid_request/);
 });
 
+test('the built UI is served for app routes; API prefixes keep JSON 404s (UI-06)', { skip }, async () => {
+  const page = await fetch(`${HUB}/connections`);
+  assert.equal(page.status, 200);
+  assert.match(page.headers.get('content-type'), /text\/html/);
+  assert.match(page.headers.get('content-security-policy'), /default-src 'self'/);
+  const html = await page.text();
+  assert.doesNotMatch(html, /<script>(?!<\/script>)|style="/, 'no inline script or style under the CSP');
+  const missing = await fetch(`${HUB}/ui-api/missing`);
+  assert.deepEqual([missing.status, (await missing.json()).error.code], [404, 'not_found']);
+  const branding = (await (await fetch(`${HUB}/ui-api/branding`)).json()).data;
+  assert.equal(branding.primaryColor, sso.signInExperience.color.primaryColor);
+});
+
+test('profile edits go to Logto through the Account API (UI-01, ID-06)', { skip }, async () => {
+  const { app, user } = await signIn();
+  const csrf = (await app('GET', '/ui-api/session')).data.data.csrf;
+  const before = (await app('GET', '/ui-api/profile')).data.data;
+  assert.equal(before.email, user.primaryEmail);
+  const update = { name: 'Ada Lovelace', displayName: 'Ada', jobTitle: 'Engineer', timezone: 'Europe/London', avatar: '' };
+  const saved = await app('POST', '/ui-api/profile', update, { 'x-csrf-token': csrf });
+  assert.equal(saved.status, 200, JSON.stringify(saved.data));
+  const logtoUser = await api('GET', `/api/users/${user.id}`);
+  assert.deepEqual([logtoUser.name, logtoUser.customData.displayName, logtoUser.customData.jobTitle, logtoUser.profile.zoneinfo], ['Ada Lovelace', 'Ada', 'Engineer', 'Europe/London']);
+  for (const bad of [{ ...update, timezone: 'Mars/Olympus' }, { ...update, displayName: '' }, { ...update, avatar: 'http://insecure.test/a.png' }]) {
+    assert.equal((await app('POST', '/ui-api/profile', bad, { 'x-csrf-token': csrf })).status, 400, JSON.stringify(bad));
+  }
+});
+
+test('admin views: forbidden for a plain user, available to owner/admin (UI-05, AU-04)', { skip }, async () => {
+  const { app } = await signIn();
+  assert.equal((await app('GET', '/ui-api/session')).data.data.isAdmin, false);
+  assert.deepEqual([(await app('GET', '/ui-api/admin/audit')).status, (await app('GET', '/ui-api/admin/connectors')).data.error.code], [403, 'forbidden']);
+
+  const password = `It!${randomBytes(9).toString('base64url')}9a`;
+  const customData = Object.fromEntries(sso.customProfileFields.filter((f) => f.required).map((f) => [f.name, 'Integration']));
+  const admin = await api('POST', '/api/users', { primaryEmail: `it-ui-admin-${Date.now()}@example.com`, password, customData });
+  cleanups.push(() => api('DELETE', `/api/users/${admin.id}`), () => deleteTestSessions(admin.id));
+  const adminRole = (await api('GET', '/api/roles?page_size=100')).find((r) => r.name === 'admin');
+  await api('POST', `/api/users/${admin.id}/roles`, { roleIds: [adminRole.id] });
+  const { app: adminApp } = await appSignIn({ appUrl: HUB, email: admin.primaryEmail, password });
+  assert.equal((await adminApp('GET', '/ui-api/session')).data.data.isAdmin, true);
+
+  const connectors = (await adminApp('GET', '/ui-api/admin/connectors')).data.data;
+  assert.equal(connectors.find((c) => c.id === 'wordpress').status, 'active');
+  const hubspot = connectors.find((c) => c.id === 'hubspot');
+  assert.deepEqual([hubspot.status, hubspot.missingEnv], ['missing_env', ['HUBSPOT_CLIENT_ID', 'HUBSPOT_CLIENT_SECRET']]);
+  assert.ok((await adminApp('GET', '/ui-api/admin/clients')).data.data.clients.some((c) => c.key === 'sample-rp'));
+
+  const audit = (await adminApp('GET', '/ui-api/admin/audit?event=connection.create&limit=5')).data.data;
+  assert.ok(audit.events.includes('credential.issue'));
+  assert.ok(audit.entries.every((e) => e.event_type === 'connection.create'));
+  assert.equal((await adminApp('GET', '/ui-api/admin/audit?event=nope')).status, 400);
+  assert.equal((await adminApp('GET', '/ui-api/admin/audit?from=yesterday')).status, 400);
+});
+
 test('logout returns the browser to the public Logto end-session URL', { skip }, async () => {
   const { app } = await signIn();
   const res = await app('GET', '/logout');

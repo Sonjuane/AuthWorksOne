@@ -7,3 +7,4 @@ node-compile-cache
 backup
 .gstack
 test
+apps/hub/ui/dist

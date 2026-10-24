@@ -166,6 +166,19 @@ Changes and findings:
 
 ### Phase 6 — Hub UI
 
+**Status 2026-10-24: done (6.1–6.7).** Proof:
+- `npm test` 102/102; `npm run test:int` 50 passed, 1 skipped (opt-in); `verify:logto` 9/9.
+- `hub-ui-session.test.js` (live) covers UI serving, branding, the profile round trip into Logto, and the admin 403/200 paths with filters.
+- A real-browser check signed in through the hosted Logto pages (including the optional 2-step prompt) and confirmed no horizontal scroll at 375 px on every page. That check caught and fixed an Account-page overflow: the grid items needed `min-w-0` for the long email.
+
+How it's built:
+- No `vue-router`: a 20-line history router instead (NF-01).
+- Production image is two stages: the UI is built with dev dependencies; runtime ships `npm ci --omit=dev` plus `ui/dist`.
+- The CSP stays strict (`default-src 'self'`); `img-src` adds `data:` (branding logo) and `https:` (avatars).
+- Roles are read at sign-in from a Hub-resource JWT; admin access is enforced server-side.
+
+Retiring the profile app (6.7): `apps/profile-app` is removed. **Owner action:** delete "Profile App" in Console → Applications (Q10).
+
 | Task | Reqs | Files | Done check |
 |---|---|---|---|
 | 6.1 Vue 3 + Tailwind (Vite) app; theme tokens from `signInExperience.color` and branding | UI-06 | `apps/hub/ui/**`, `apps/hub/vite.config.js` | E2E at 375 px: no horizontal scroll; primary color = config `primaryColor`. |

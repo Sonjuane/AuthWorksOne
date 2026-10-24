@@ -1,6 +1,8 @@
 // Connector Hub service entry point: validate config and secrets, require an up-to-date schema,
 // then serve HTTP. Refuses to start (exit 1) when anything required is missing (NF-05).
 import { createVerifier } from '../lib/jwt.js';
+import { createAccount } from './core/account.js';
+import { createStaticHandler } from './core/static.js';
 import { createOidc } from '../lib/oidc.js';
 import { startApp } from '../lib/web.js';
 import { createAudit } from './core/audit.js';
@@ -103,6 +105,16 @@ const authenticate = createAuthenticator({
   clients: config.clients,
 });
 const onUserDeleted = ({ sub, context }) => purgeUser({ sql, tenantId: config.tenantId, connections, audit, sub, source: 'webhook', context });
+const account = createAccount({ apiBase: config.logtoApiBase, accessToken: (session) => oidc.accessToken(session) });
+
+// Built Vue UI (npm run hub:ui:build). GETs outside the API prefixes are UI routes.
+const ui = createStaticHandler();
+if (!ui.built) log.warn('ui_not_built', { reason: 'apps/hub/ui/dist missing; run npm run hub:ui:build' });
+const API_PREFIXES = ['/v1/', '/ui-api/', '/webhooks/', '/connect/'];
+const notFound = (ctx) =>
+  ui.built && ctx.req.method === 'GET' && !API_PREFIXES.some((p) => ctx.url.pathname.startsWith(p))
+    ? ui.serve(ctx)
+    : respondError(ctx, new ApiError(404, 'not_found', 'No such route'));
 
 startApp({
   name: 'Connector Hub',
@@ -110,7 +122,7 @@ startApp({
   sessionStore: createSessionStore({ sql, vault, tenantId: config.tenantId }),
   headers: securityHeaders({ https }),
   secureCookies: https,
-  notFound: (ctx) => respondError(ctx, new ApiError(404, 'not_found', 'No such route')),
+  notFound,
   onError: errorHandler(log),
   onListen: () =>
     log.info('started', {
@@ -130,7 +142,7 @@ startApp({
     ...apiRoutes({ authenticate, connections, consents, audit, validate: openApiValidator(openApi) }),
     ...authRoutes({ oidc, baseUrl: config.baseUrl }),
     ...connectRoutes({ connections }),
-    ...uiApiRoutes({ connections, consents }),
+    ...uiApiRoutes({ connections, consents, account, registry, config, sql }),
     ...webhookRoutes({ signingKey: config.webhookSigningKey, onUserDeleted, log }),
   },
 });

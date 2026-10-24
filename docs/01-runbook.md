@@ -33,6 +33,8 @@ Required once per fresh database, before `npm run provision` works.
 
 Provision output legend: `+` created, `=` exists/updated, `-` skipped (with reason). Re-running is safe.
 
+**Retire an app**: remove its entry from `applications`, then delete it once in Console → Applications. Provision never deletes apps (build plan Q10). Pending: delete **"Profile App"** (retired with the Hub UI Account page; `PROFILE_APP_*` disappears from `.env.apps` on the next provision).
+
 ## 4. Connectors
 
 - **Google Workspace**: create an OAuth client in Google Cloud Console (redirect URI `$LOGTO_ENDPOINT/callback/google-universal`; for Workspace-only audiences choose *Internal*). Set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in `.env` → `npm run provision`. The `google` button appears on the sign-in page automatically.
@@ -59,8 +61,11 @@ First run (after §2 bootstrap and `npm run provision`, which writes `HUB_UI_*` 
 #       HUB_MASTER_KEY_CURRENT=v1, HUB_BASE_URL — see .env.example
 npm run hub:db:init     # + role hub, + database hub (idempotent; re-syncs the role password)
 npm run hub:migrate     # + 001_init.sql … (idempotent)
-npm run up              # compose `hub` service on :3030 (or `npm run hub` on the host — not both)
+npm run up              # compose `hub` service on :3030, UI built into the image
+# host instead (not both): npm run hub:ui:build && npm run hub
 ```
+
+- **Hub UI** (`http://localhost:3030`): Connections, App access, Account (profile via the Logto Account API; security settings link to Account Center), Admin (users with the `owner` or `admin` role: connector status with missing env names, client settings, audit log with filters), and the consent page (`/consent`, the target of `consentUrl`). After UI changes: `npm run hub:ui:build` (host) or `docker compose up -d --build hub`. For UI development: `npm run hub:ui:dev` (Vite on :5173, proxying API calls to :3030).
 
 - **Startup refusal**: missing secrets, a non-https `HUB_BASE_URL` with `NODE_ENV=production`, or pending migrations → JSON log `startup_failed` with the reason, exit 1. The compose service restarts until fixed.
 - **Health**: `GET /health` → `{ meta, data: { status: "ok" } }` (checks the database). API document: `GET /openapi.json`; tools list: `GET /v1/manifest`.
@@ -138,6 +143,7 @@ Also back up `.env` (contains the only copy of the M2M credentials and Postgres 
 | Hub log `startup_failed … Missing required env vars` | Set the listed vars in `.env`; `HUB_UI_*` / `HUB_WEBHOOK_SIGNING_KEY` come from `npm run provision` (`.env.apps`). |
 | `npm run hub` fails with `EADDRINUSE :3030` | The compose `hub` service is running; stop it (`docker compose stop hub`) or use it instead. |
 | `npm run verify:logto` LV-01 fails to reach the mock IdP | Logto calls the in-process mock at `host.docker.internal:3098`. Linux: add `extra_hosts: ["host.docker.internal:host-gateway"]` to the `logto` service. |
-| `/account/profile` returns Page not found | Logto 1.41 ships security/email/username/password pages only; profile + custom fields editing is covered by the profile app (`:3020`). Re-check after image upgrades. |
+| `/account/profile` returns Page not found | Profile + custom fields editing is in the Hub UI Account page (`:3030/account`); Logto Account Center handles security settings only. |
+| Hub UI shows JSON `not_found` instead of the app | UI not built: `npm run hub:ui:build` (host) or rebuild the image (`docker compose up -d --build hub`). The Hub logs `ui_not_built` at startup. |
 | Custom claims missing from access token | Claims apply only to resource-bound JWT access tokens (request with `resource=`); the default opaque token shows claims via `userinfo` `custom_data` instead. Check Console → Custom JWT for script errors. |
 | M2M token 401 | `LOGTO_M2M_CLIENT_*` wrong or the app lost the **Logto Management API access** role (Console → Applications → Provisioner → Roles). |

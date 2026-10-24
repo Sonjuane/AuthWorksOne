@@ -16,12 +16,11 @@ Wait until `http://localhost:3001/oidc/.well-known/openid-configuration` returns
 npm run provision               # applies config/sso.config.json to Logto (idempotent)
 npm run mailbox                 # dev-only: tails the mailbox container (sign-up verification codes)
 npm run rp                      # sample relying party  -> http://localhost:3010
-npm run profile                 # custom profile UI     -> http://localhost:3020
 ```
 
-Sign up at `http://localhost:3010` (verification code prints in the mailbox log; 2FA set-up is offered and can be skipped), then open `http://localhost:3020` — you are signed in without credentials (SSO).
+Connector Hub (`:3030`): set the `HUB_*` values in `.env` (see `.env.example`), then `npm run hub:db:init && npm run hub:migrate`. `npm run up` builds and runs it in compose, UI included ([docs/01-runbook.md §4b](docs/01-runbook.md)).
 
-Connector Hub (`:3030`): set the `HUB_*` values in `.env` (see `.env.example`), then `npm run hub:db:init && npm run hub:migrate`. `npm run up` runs it in compose ([docs/01-runbook.md §4b](docs/01-runbook.md)).
+Sign up at `http://localhost:3010` (verification code prints in the mailbox log; 2FA set-up is offered and can be skipped), then open `http://localhost:3030` — you are signed in to the Hub without credentials (SSO).
 
 Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only), `npm run test:int` (live tenant + Hub database: provisioning, applied config, role claims, Hub foundation), `npm run verify:logto` (LV-01–LV-09).
 
@@ -33,9 +32,8 @@ Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only
 | `http://localhost:3001/account` | Prebuilt account center (email, username, password) |
 | `http://localhost:3002` | Logto Admin Console |
 | `http://localhost:3010` | Sample RP: PKCE login, ID-token/userinfo/JWT-access-token views, SSO logout |
-| `http://localhost:3020` | Custom profile UI: edits name/avatar/custom fields via the Account API |
 | `http://localhost:3099` | Dev mailbox container: JSON list of received emails (`npm run mailbox` tails it) |
-| `http://localhost:3030` | Connector Hub: app API `/v1/connections`, `/v1/credentials`; `/login`, `/connect/start`, `/ui-api/*` (JSON for the Hub UI), `/webhooks/logto`, `/health`, `/openapi.json` (the Vue UI arrives in Phase 6) |
+| `http://localhost:3030` | Connector Hub UI (Connections, App access, Account, Admin, consent page) + app API `/v1/connections`, `/v1/credentials`; `/ui-api/*`, `/webhooks/logto`, `/health`, `/openapi.json` |
 | `http://localhost:3097` | Mock provider (compose profile `test`): OAuth 2.0 + APIs + `/_control/*` |
 
 ## Repository map
@@ -43,7 +41,7 @@ Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only
 | Path | Contents |
 | --- | --- |
 | [docker-compose.yml](docker-compose.yml) | Logto 1.45 + PostgreSQL 17 (127.0.0.1:5432), named volume, healthchecks; `mailbox` and `hub` services (profiles `dev`, `test`) |
-| [apps/hub/](apps/hub/) | Connector Hub: `server.js`, `openapi.json` (API source of truth), `core/` (config, vault, sealed tables, connections, audit, SSRF-guarded HTTP, logger, auth, security, registry, extension helpers, manifest, db, migrations, sessions, HTTP envelope), `routes/` (login, connect, UI API), `auth-types/` + `connectors/` (extension points), `schemas/`, `migrations/`, `Dockerfile` |
+| [apps/hub/](apps/hub/) | Connector Hub: `server.js`, `openapi.json` (API source of truth), `core/` (config, vault, sealed tables, connections, audit, SSRF-guarded HTTP, logger, auth, security, registry, extension helpers, manifest, db, migrations, sessions, HTTP envelope), `routes/` (login, connect, UI API, app API, webhooks), `ui/` (Vue 3 + Tailwind source; `npm run hub:ui:build` → `ui/dist`), `auth-types/` + `connectors/` (extension points), `schemas/`, `migrations/`, `Dockerfile` |
 | [config/sso.config.json](config/sso.config.json) | Declarative SSO config: resources + scopes, roles, role assignments, applications (+ Hub client settings), social connectors, email provider, webhooks, sign-in experience (MFA, lockout, account linking), account center, custom profile fields, JWT claims, Hub settings |
 | [config/schemas/sso.config.schema.json](config/schemas/sso.config.schema.json) | JSON Schema for the config (editor validation + contract) |
 | [scripts/provision.js](scripts/provision.js) | Idempotent apply of the config via Management API; writes app credentials to `.env.apps` |
@@ -55,7 +53,6 @@ Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only
 | [test/](test/) | `unit/` (config schema, generated scripts, Hub core + registry + OpenAPI, repo hygiene), `contract/` (EX-06 suites), `integration/` (live tenant, Hub database), `mock-provider/` (mock OAuth/API provider), `fixtures/` |
 | [apps/lib/](apps/lib/) | Shared utilities: OIDC relying-party helper (PKCE, JWKS verify, logout), access-token verifier (`jwt.js`), minimal HTTP/session/HTML helper (pluggable session store) |
 | [apps/sample-rp/server.js](apps/sample-rp/server.js) | Sample third-party app (issuer + client ID/secret only) |
-| [apps/profile-app/server.js](apps/profile-app/server.js) | Custom-branded profile editor against the Account API |
 | [docs/01-runbook.md](docs/01-runbook.md) | Operations: bootstrap, add an app, connectors, key rotation, backup/restore, secrets, production |
 | [docs/03-hub-extensions.md](docs/03-hub-extensions.md) | Authoring guide: add a Hub connector or auth type; contract suites |
 | [docs/02-build-plan.md](docs/02-build-plan.md) | Build plan for the Logto extensions + Connector Hub: Phase 0 results, phases/tasks, traceability matrix, Hub design, API outline, config changes, test plan, open questions |

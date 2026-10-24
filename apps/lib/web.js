@@ -65,6 +65,7 @@ export function startApp({ name, port, routes, sessionStore = memorySessionStore
       req,
       session,
       ip: req.socket.remoteAddress,
+      send,
       redirect: (to) => send(302, { Location: to }),
       html: (body, status = 200) => send(status, { 'Content-Type': 'text/html; charset=utf-8' }, body),
       json: (body, status = 200) => send(status, { 'Content-Type': 'application/json; charset=utf-8' }, JSON.stringify(body)),

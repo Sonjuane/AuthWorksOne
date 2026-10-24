@@ -52,6 +52,15 @@ With a `Prompt*` MFA policy, `POST /api/experience/submit` for a user without MF
 ## Containers can't use the public issuer URL for server-to-server calls
 `LOGTO_ENDPOINT=http://localhost:3001` is the token `iss` and the browser URL, but `localhost` inside a container is the container itself. Fetch the JWKS (and later token endpoints) via `LOGTO_INTERNAL_ENDPOINT=http://logto:3001`, while still validating `iss` against the public issuer.
 
+## Tailwind v4: `@apply` only takes utilities
+`@apply btn` inside `@layer components` fails. Define shared classes with `@utility btn { … }`; other utilities can then `@apply` them (`apps/hub/ui/src/style.css`).
+
+## Grid/flex children need `min-w-0` for truncation
+Grid items default to `min-width: auto`, so a long unbreakable string (an email) widens the column past the phone viewport even with `truncate`. Add `min-w-0` on the grid item, and `shrink-0` on fixed-size siblings. This was found at 375 px on the Account page.
+
+## Hub pages can't be framed
+CSP `frame-ancestors 'none'` plus `X-Frame-Options: DENY` block iframes, so test scripts that load Hub pages in an iframe get a null `contentDocument`. Navigate the page instead.
+
 ## Logto 1.45 blocks webhooks to private addresses
 Hook deliveries go through `ssrfProtectedFetch`. `http://hub:3030/...` fails with `hook.send_test_payload_failed: fetch failed`. `SSRF_ALLOWED_ADDRESSES` (CIDR list) on the `logto` service fixes it; the compose network is pinned (`COMPOSE_SUBNET`) so the allowlist is exact. `SSRF_PROTECTION_DISABLED` also exists, but it disables protection entirely. Either one disables Logto's CIMD feature (unused here). Signature: `logto-signature-sha-256` = hex HMAC-SHA256 of `JSON.stringify(payload)`; the `User.Deleted` payload carries `user.id` and `params.userId`.
 

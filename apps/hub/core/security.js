@@ -10,6 +10,13 @@ export function requireUser(ctx) {
   return ctx.session.user;
 }
 
+// Hub admin views (UI-05): global owner or admin role, captured at sign-in.
+export function requireAdmin(ctx, adminRoles) {
+  const user = requireUser(ctx);
+  if (!(user.roles ?? []).some((role) => adminRoles.includes(role))) throw new ApiError(403, 'forbidden', 'Hub admin requires the owner or admin role');
+  return user;
+}
+
 // The UI reads the token from GET /ui-api/session and sends it as `x-csrf-token`.
 export function requireCsrf(ctx) {
   const sent = Buffer.from(String(ctx.req.headers['x-csrf-token'] ?? ''));

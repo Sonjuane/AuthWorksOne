@@ -61,6 +61,17 @@ export function loadConfig({ env = process.env, sso = JSON.parse(readFileSync(ss
     issuer: `${logto}/oidc`,
     jwksUri: `${logtoInternal}/oidc/jwks`,
     logtoInternalOrigin: logtoInternal !== logto ? new URL(logtoInternal).origin : undefined,
+    // Server-to-server base for the Logto Account API; browsers get the public Account Center URL.
+    logtoApiBase: logtoInternal,
+    accountCenterUrl: `${logto}/account`,
+    branding: sso.signInExperience?.color && {
+      primaryColor: sso.signInExperience.color.primaryColor,
+      darkPrimaryColor: sso.signInExperience.color.darkPrimaryColor ?? sso.signInExperience.color.primaryColor,
+      isDarkModeEnabled: sso.signInExperience.color.isDarkModeEnabled ?? false,
+      logoUrl: sso.signInExperience.branding?.logoUrl || null,
+      darkLogoUrl: sso.signInExperience.branding?.darkLogoUrl || sso.signInExperience.branding?.logoUrl || null,
+    },
+    adminRoles: ['owner', 'admin'],
     allowPrivateUrls,
     resource: sso.hub.resource,
     databaseUrl: env.HUB_DATABASE_URL,

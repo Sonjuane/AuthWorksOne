@@ -85,16 +85,6 @@
       "postLogoutRedirectUris": ["http://localhost:3011/"],
       "customClientMetadata": { "rotateRefreshToken": true, "refreshTokenTtlInDays": 14 },
       "hub": { "allowedConnectors": ["hubspot"], "consentReturnUris": ["http://localhost:3011/connections"] }
-    },
-    {
-      "key": "profile-app",
-      "name": "Profile App",
-      "type": "Traditional",
-      "baseUrl": "http://localhost:3020",
-      "port": 3020,
-      "scope": "openid profile email custom_data",
-      "redirectUris": ["http://localhost:3020/callback"],
-      "postLogoutRedirectUris": ["http://localhost:3020/"]
     }
   ],
   "connectors": [

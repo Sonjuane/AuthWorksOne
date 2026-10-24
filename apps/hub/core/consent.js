@@ -69,7 +69,7 @@ export function createConsents({ sql, tenantId, clients, registry, baseUrl, audi
         : await sql`select * from connections where tenant_id = ${tenantId} and sub = ${sub} and connector_id = ${id} order by created_at`;
       return {
         app: { clientId, name: client.name },
-        connector: { id, name: entry.definition.name },
+        connector: { id, name: entry.definition.name, flow: typeof entry.handler.authorize === 'function' ? 'redirect' : 'form' },
         connections: candidates.map((c) => ({ id: c.id, label: c.label, status: c.status })),
         returnTo: returnUriFor(client, returnTo),
       };

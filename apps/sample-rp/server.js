@@ -40,7 +40,7 @@ startApp({
         </p>
         <p>
           <a class="button secondary" href="${escapeHtml(logtoEndpoint)}/account">Account center</a>
-          <a class="button secondary" href="http://localhost:3020/">Profile app</a>
+          <a class="button secondary" href="http://localhost:3030/account">Hub account</a>
           <a class="button secondary" href="/logout">SSO logout</a>
         </p>`));
     },

@@ -4,3 +4,4 @@ node_modules/
 .gstack/
 node-compile-cache/
 backup/
+apps/hub/ui/dist/

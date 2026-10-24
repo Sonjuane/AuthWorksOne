@@ -1,7 +1,7 @@
 // Phase 5 integration tests: the public Hub API over HTTP (TV-01..TV-07, HA-03, HA-05) with real
 // Logto tokens, consent rules, audit (AU-02/03), the Logto webhook (VA-08), and reconciliation.
 // A second Hub process runs on :3996 as tenant `itest` with mock-pointed connectors; `hub-ui`'s
-// client id stands in for the registered `second-client`, `profile-app` is unregistered.
+// client id stands in for the registered `second-client`; a throwaway Logto app is unregistered.
 // The real Logto -> compose Hub delivery test (S15) uses the running compose Hub (tenant default).
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -89,7 +89,19 @@ const app = (key) => {
   const redirectUri = sso.applications.find((a) => a.key === key).redirectUris[0];
   return createClient({ clientId: process.env[`${prefix}_CLIENT_ID`], clientSecret: process.env[`${prefix}_CLIENT_SECRET`], redirectUri });
 };
-const clientsByName = { rp: app('sample-rp'), second: app('hub-ui'), unregistered: app('profile-app') };
+// Unregistered client: a Logto app that exists only for this run (no `hub` block anywhere).
+const tempApp = await api('POST', '/api/applications', {
+  name: `it-unregistered-${Date.now()}`,
+  type: 'Traditional',
+  oidcClientMetadata: { redirectUris: ['http://localhost:3999/callback'], postLogoutRedirectUris: [] },
+});
+cleanups.push(() => api('DELETE', `/api/applications/${tempApp.id}`));
+const [tempSecret] = await api('GET', `/api/applications/${tempApp.id}/secrets`);
+const clientsByName = {
+  rp: app('sample-rp'),
+  second: app('hub-ui'),
+  unregistered: createClient({ clientId: tempApp.id, clientSecret: tempSecret.value, redirectUri: 'http://localhost:3999/callback' }),
+};
 const tokenFor = async (user, name, { resource = config.resource, scope = 'connections:read connections:token' } = {}) => {
   const client = clientsByName[name];
   const { tokens, error } = await client.signIn(user.primaryEmail, user.password, { scope: `openid offline_access ${scope}`, resource });

@@ -12,7 +12,8 @@ export const respondError = (ctx, err) =>
 
 // Security headers (NF-06); HSTS only when served over https.
 export const securityHeaders = ({ https }) => ({
-  'Content-Security-Policy': "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+  // Images: the branding logo is a data: URI; avatars are https URLs.
+  'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   'X-Frame-Options': 'DENY',
