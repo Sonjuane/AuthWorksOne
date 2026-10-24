@@ -2,7 +2,7 @@
 type: decision-log
 title: Decisions
 description: ADR-style log of significant technical decisions and their rationale.
-last_updated: 2026-10-23
+last_updated: 2026-10-24
 ---
 
 # Decisions
@@ -39,6 +39,12 @@ Logto app IDs are generated per environment, so committed config keys apps by `k
 
 ## 2026-10-24 — Upgrade Logto 1.41 → 1.45 (user request)
 Image `svhd/logto:1.45` (core 1.45.0, latest stable). Ran `db alteration deploy 1.45.0` (16 alterations); pre-upgrade dump in `backup/` (git-ignored). Phase 0 probes re-ran with identical results. The AU-01 gap remains, so the §8 move stands. Supersedes "stay on 1.41" above.
+
+## 2026-10-24 — Phase 1 defaults for build-plan Q6, Q7, Q11, Q13 (user choice)
+- **Q6:** Roles are assigned by config through `roleAssignments[]`, with emails from env (`OWNER_EMAILS`), so no PII is in git. The Console stays for ad-hoc assignment.
+- **Q7:** Lockout is `sentinelPolicy {maxAttempts: 5, lockoutDuration: 15}` (minutes).
+- **Q11:** Provision gives `isDefault` roles to existing users that have no roles.
+- **Q13:** Logto's TTL-gated rotation (confidential clients rotate after 70% of TTL) satisfies ID-09.
 
 ## 2026-10-23 — Email: AWS SES or Cloudflare relay; SMTP removed (user choice)
 EM-01 picks `aws-ses-mail` or `http-email` → Cloudflare relay through a config `email.provider`. The SMTP connector entry is removed. The `http-email` dev fallback to `scripts/dev-mailbox.js` stays.

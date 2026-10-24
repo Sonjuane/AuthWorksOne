@@ -96,7 +96,7 @@ const sesCheck = async () => {
   };
   const to = process.env.SES_TEST_RECIPIENT;
   if (!to || Object.values(sesConfig).some((v) => !v)) return 'skip (AWS_SES_* / SES_TEST_RECIPIENT not set)';
-  const templates = config.connectors?.find((c) => c.config?.templates)?.config.templates ?? [];
+  const templates = config.email?.templates ?? [];
   await api('POST', '/api/connectors/aws-ses-mail/test', { email: to, config: { ...sesConfig, templates } });
   return `test email sent to ${to}`;
 };

@@ -39,6 +39,16 @@ export function browser() {
   };
 }
 
+// Submits the interaction, skipping the optional MFA set-up prompt (Prompt* policies raise
+// `user.suggest_mfa`) like the hosted page's "skip" button. Mandatory MFA is returned unchanged.
+const submit = async (req) => {
+  const res = await req('POST', '/api/experience/submit');
+  const skippable = res.data?.code === 'user.suggest_mfa' || (res.data?.code === 'user.missing_mfa' && res.data?.data?.skippable);
+  if (!skippable) return res;
+  ok(await req('POST', '/api/experience/profile/mfa/mfa-skipped'), 'skip MFA prompt');
+  return req('POST', '/api/experience/submit');
+};
+
 // Logto Account API call with a user access token (opaque, no resource).
 export async function accountApi(accessToken, method, path, body, verificationId) {
   const res = await fetch(`${endpoint()}${path}`, {
@@ -117,14 +127,14 @@ export function createClient({ clientId, clientSecret, redirectUri }) {
     const pw = await req('POST', '/api/experience/verification/password', { identifier: { type: 'email', value: email }, password });
     if (pw.status >= 400) return { error: pw.data?.code };
     ok(await req('POST', '/api/experience/identification', { verificationId: pw.data.verificationId }), 'identification');
-    let submit = await req('POST', '/api/experience/submit');
-    if (submit.status >= 400 && mfa) {
+    let submitted = await submit(req);
+    if (submitted.status >= 400 && mfa) {
       if (mfa.totpSecret) ok(await req('POST', '/api/experience/verification/totp/verify', { code: totp(mfa.totpSecret) }), 'totp');
       if (mfa.backupCode) ok(await req('POST', '/api/experience/verification/backup-code/verify', { code: mfa.backupCode }), 'backup code');
-      submit = await req('POST', '/api/experience/submit');
+      submitted = await submit(req);
     }
-    if (submit.status >= 400) return { error: submit.data?.code };
-    return { tokens: await finish(submit.data.redirectTo) };
+    if (submitted.status >= 400) return { error: submitted.data?.code };
+    return { tokens: await finish(submitted.data.redirectTo) };
   }
 
   // Social sign-in via a Logto social connector. `toBrowserUrl` maps the IdP authorization URL to one
@@ -151,7 +161,7 @@ export function createClient({ clientId, clientSecret, redirectUri }) {
       identified = await req('POST', '/api/experience/identification', { verificationId: auth.verificationId, linkSocialIdentity: true });
     }
     if (identified.status >= 400) return { error: identified.data?.code, relatedUser: Boolean(identified.data?.data?.relatedUser) };
-    const tokens = await finish(ok(await req('POST', '/api/experience/submit'), 'submit').redirectTo);
+    const tokens = await finish(ok(await submit(req), 'submit').redirectTo);
     return { sub: decodeJwt(tokens.id_token).sub };
   }
 

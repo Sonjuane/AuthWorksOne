@@ -40,6 +40,19 @@ Legend: **Reqs** = spec IDs satisfied; **S#** = spec §7.2 acceptance scenario.
 
 ### Phase 1 — Logto config-as-code (Deliverable 1)
 
+**Status 2026-10-24 (Logto 1.45.0):** Done: 1.1–1.9, 1.11–1.13, 1.15. Proof: `npm test` 6/6, `npm run test:int` 8/8 (includes S9 and S20), `npm run verify:logto` 9/9 with the tenant unchanged.
+
+Open:
+- **1.10:** blocked on Q1.
+- **1.14:** only the key-rotation test is left; it moves to Phase 2 (task 2.7) because it needs the Hub's JWT verifier.
+
+Verified only on their skip path, because the credentials or mock don't exist yet:
+- GitHub login (1.4): no `GITHUB_*` set.
+- SES (1.9): no `AWS_SES_*` set.
+- `SSO_PROFILE=test` entries (1.5, 1.6): need the mock provider from Phase 4.
+
+The `Hub: user deleted` hook is provisioned `enabled: false` until task 5.4.
+
 | Task | Reqs | Files | Done check |
 |---|---|---|---|
 | 1.1 Resource scopes + global roles (`owner`, `admin`, `user` default) with per-resource permissions; Hub resource `https://hub.authworks.local` with `connections:read`, `connections:token` | ID-07, ID-08, HA-03, IA-01, NF-10 | `config/sso.config.json`, `config/schemas/sso.config.schema.json`, `scripts/provision.js` | First run `+` per scope/role; second run `=` only. `GET /api/roles` shows 3 roles with permissions; `user.isDefault = true`. |
@@ -462,11 +475,13 @@ Behavior rules:
   "email": {
     "provider": "ses",
     "templates": [ { "usageType": "SignIn", "subject": "…", "content": "…" } ],
-    "ses": { "configEnv": { "accessKeyId": "AWS_SES_ACCESS_KEY_ID", "accessKeySecret": "AWS_SES_SECRET", "region": "AWS_SES_REGION", "emailAddress": "AWS_SES_FROM" } },
-    "cloudflare": { "configEnv": { "endpoint": "EMAIL_RELAY_URL", "authorization": "EMAIL_RELAY_TOKEN" } },
-    "devFallback": { "endpoint": "http://mailbox:3099/email" }
+    "providers": {
+      "ses": { "connectorId": "aws-ses-mail", "templates": true, "configEnv": { "accessKeyId": "AWS_SES_ACCESS_KEY_ID", "accessKeySecret": "AWS_SES_SECRET", "region": "AWS_SES_REGION", "emailAddress": "AWS_SES_FROM" } },
+      "cloudflare": { "connectorId": "http-email", "configEnv": { "endpoint": "EMAIL_RELAY_URL", "authorization": "EMAIL_RELAY_TOKEN" } }
+    },
+    "devFallback": { "connectorId": "http-email", "config": { "endpoint": "http://mailbox:3099/email" } }
   },
-  "hooks": [{ "name": "hub-user-deleted", "events": ["User.Deleted"], "url": "http://hub:3030/webhooks/logto", "signingKeyEnvOut": "HUB_WEBHOOK_SIGNING_KEY" }],
+  "hooks": [{ "name": "Hub: user deleted", "events": ["User.Deleted"], "url": "http://hub:3030/webhooks/logto", "enabled": false, "signingKeyEnvOut": "HUB_WEBHOOK_SIGNING_KEY" }],
   "signInExperience": {
     "forgotPasswordMethods": ["EmailVerificationCode"],
     "socialSignIn": { "automaticAccountLinking": true },
@@ -494,8 +509,8 @@ Fragment only. Unchanged keys are omitted, and `…` marks values copied from th
 | `roleAssignments[]` | new: `{role, emailsEnv}` |
 | `applications[]` | add `customClientMetadata {rotateRefreshToken, refreshTokenTtlInDays (1–90)}`, `hub {allowedConnectors: string[], consentReturnUris: uri[]}`, `profiles: string[]`; `redirectUris`/`postLogoutRedirectUris`/`consentReturnUris` items `"not": {"pattern": "\\*"}` |
 | `connectors[]` | add `metadata {target, name}`, `profiles: string[]` |
-| `email` | new: `provider` enum `ses`\|`cloudflare`, `templates[]` `{usageType, subject, content, contentType?}`, `ses`, `cloudflare` (`configEnv` maps), `devFallback {endpoint}` |
-| `hooks[]` | new: `{name, events: string[], url (uri), signingKeyEnvOut}` |
+| `email` | new: `provider`, `templates[]` `{usageType, subject, content}`, `providers.<name> {connectorId, templates?, configEnv, config?}`, `devFallback {connectorId, config}` |
+| `hooks[]` | new: `{name, events: string[], url (uri), enabled?, signingKeyEnvOut?}` |
 | `signInExperience` | document passthrough keys `forgotPasswordMethods`, `socialSignIn`, `mfa {factors, policy}`, `sentinelPolicy {maxAttempts, lockoutDuration}` |
 | `customJwtClaims.roles` | boolean |
 | `hub` | new: `{resource (uri), connectors: {<id>: {enabled: boolean}}}` (Hub-only; provision reads only `resource`) |
@@ -591,14 +606,14 @@ URL split: browser-facing authorize URLs use `http://localhost:3097`; container-
 | Q3 | First-time consent needs a connector-level request: `POST /v1/credentials {connectorId}` (§4) vs. only `{connectionId}` as TV-05 literally states. | 5.2, S5 |
 | Q4 | Rule 05 asks for MCP discovery. The plan ships `GET /v1/manifest` (tools list); a full MCP JSON-RPC transport is not planned. OK? | 3.1 |
 | Q5 | `schema_migrations` without `tenant_id` (runner metadata) vs. NF-03 "every Hub table". | 2.3 |
-| Q6 | S9 "assigns a role via config/provision": the plan adds `roleAssignments[]` with emails from env (`OWNER_EMAILS`) to keep PII out of git. AD-01 keeps ad-hoc assignment in the Console. OK? | 1.12, S9 |
-| Q7 | Lockout values: assumed `maxAttempts: 5`, `lockoutDuration: 15` (minutes). | 1.3 |
+| Q6 | **Resolved 2026-10-24:** `roleAssignments[]` with emails from env (`OWNER_EMAILS`); the Console stays for ad-hoc assignment. | 1.12, S9 |
+| Q7 | **Resolved 2026-10-24:** `maxAttempts: 5`, `lockoutDuration: 15` (minutes). | 1.3 |
 | Q8 | UI tooling (Vite + `@vitejs/plugin-vue` + Tailwind v4) and Postgres driver (`postgres` vs `pg`). | 2.1, 6.1 |
 | Q9 | A `User.Deleted` webhook missed while the Hub is down leaves orphaned connections. Add reconciliation (not in spec), or accept? | 5.4, VA-08 |
 | Q10 | Provision never deletes. Retiring `profile-app` leaves its Logto app; delete it manually in the Console or add `-` removal for config-dropped apps? | 6.7, AD-02 |
-| Q11 | Logto applies default roles only at user creation. Existing users need a one-time `user` role backfill to get Hub scopes. | 1.1 |
+| Q11 | **Resolved 2026-10-24:** provision gives `isDefault` roles to existing users with no roles. | 1.1 |
 | Q12 | TV-05 response adds `authType` and `auth` (header/format) beyond the spec's list, and errors add `invalid_token`, `insufficient_scope`, `provider_unavailable` beyond TV-06. OK? | 3.1, 5.2 |
-| Q13 | Confidential clients rotate refresh tokens only after 70% of TTL (LV-07). Does that satisfy ID-09's "refresh token rotation"? | 1.6 |
+| Q13 | **Resolved 2026-10-24:** TTL-gated rotation satisfies ID-09. | 1.6 |
 | Q14 | The 1.41.0 Account Center bundle contains a `/profile` route, while `memory/gotchas.md` says it is missing. Re-check in a browser; the gotcha may be stale (no scope impact: profile editing is in the Hub UI per UI-01). | 6.3 |
 
 ### Risks

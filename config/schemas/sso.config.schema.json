@@ -5,6 +5,24 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["applications", "signInExperience", "accountCenter"],
+  "definitions": {
+    "exactUri": {
+      "type": "string",
+      "format": "uri",
+      "not": { "pattern": "\\*" },
+      "description": "Exact-match URI; wildcards are rejected (ID-09)"
+    },
+    "configEnv": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "connector config field -> env var name; the entry is skipped when any env var is empty"
+    },
+    "profiles": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Applied only when SSO_PROFILE (default `dev`) is listed; omit to apply in every profile"
+    }
+  },
   "properties": {
     "$schema": { "type": "string" },
     "resources": {
@@ -15,8 +33,54 @@
         "required": ["name", "indicator"],
         "properties": {
           "name": { "type": "string" },
-          "indicator": { "type": "string", "format": "uri" }
+          "indicator": { "type": "string", "format": "uri" },
+          "scopes": {
+            "type": "array",
+            "description": "API resource permissions; granted to users only through roles",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name"],
+              "properties": { "name": { "type": "string" }, "description": { "type": "string" } }
+            }
+          }
         }
+      }
+    },
+    "roles": {
+      "type": "array",
+      "description": "Global user roles; names are emitted in access tokens when customJwtClaims.roles is true",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "description"],
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "isDefault": { "type": "boolean", "description": "Assigned to new users; provision also gives it to existing users that have no roles" },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["resource", "scopes"],
+              "properties": {
+                "resource": { "type": "string", "format": "uri" },
+                "scopes": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "roleAssignments": {
+      "type": "array",
+      "description": "Role grants by user email; emails come from env (comma-separated) to keep PII out of git",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "emailsEnv"],
+        "properties": { "role": { "type": "string" }, "emailsEnv": { "type": "string" } }
       }
     },
     "applications": {
@@ -27,32 +91,110 @@
         "required": ["key", "name", "type", "redirectUris", "postLogoutRedirectUris"],
         "properties": {
           "key": { "type": "string", "pattern": "^[a-z0-9-]+$", "description": "Stable key; SCREAMING_SNAKE prefix of the env vars written to .env.apps" },
-          "name": { "type": "string" },
-          "type": { "enum": ["Traditional", "SPA", "Native", "MachineToMachine"] },
+          "name": { "type": "string", "description": "Provision matches existing Logto apps by name; renaming creates a new app" },
+          "type": { "enum": ["Traditional", "SPA", "Native", "MachineToMachine"], "description": "SPA/Native are public clients; Logto requires PKCE for them" },
+          "profiles": { "$ref": "#/definitions/profiles" },
           "baseUrl": { "type": "string", "format": "uri", "description": "Local dev server origin for the bundled sample apps" },
           "port": { "type": "integer" },
           "scope": { "type": "string", "description": "Space-separated OIDC scopes the app requests" },
           "resource": { "type": "string", "format": "uri", "description": "API resource indicator the app requests JWT access tokens for" },
-          "redirectUris": { "type": "array", "items": { "type": "string", "format": "uri" }, "minItems": 1 },
-          "postLogoutRedirectUris": { "type": "array", "items": { "type": "string", "format": "uri" } }
+          "redirectUris": { "type": "array", "items": { "$ref": "#/definitions/exactUri" }, "minItems": 1 },
+          "postLogoutRedirectUris": { "type": "array", "items": { "$ref": "#/definitions/exactUri" } },
+          "customClientMetadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rotateRefreshToken": { "type": "boolean" },
+              "refreshTokenTtlInDays": { "type": "integer", "minimum": 1, "maximum": 90 }
+            }
+          },
+          "hub": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["allowedConnectors", "consentReturnUris"],
+            "description": "Connector Hub per-client settings (HA-05); not sent to Logto",
+            "properties": {
+              "allowedConnectors": { "type": "array", "items": { "type": "string" } },
+              "consentReturnUris": { "type": "array", "items": { "$ref": "#/definitions/exactUri" } }
+            }
+          }
         }
       }
     },
     "connectors": {
       "type": "array",
+      "description": "Social sign-in connectors (email connectors live under `email`)",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["connectorId"],
         "properties": {
           "connectorId": { "type": "string", "description": "Logto connector factory id" },
-          "configEnv": {
+          "profiles": { "$ref": "#/definitions/profiles" },
+          "metadata": {
             "type": "object",
-            "additionalProperties": { "type": "string" },
-            "description": "connector config field -> env var name; connector is skipped when any env var is empty"
+            "additionalProperties": false,
+            "required": ["target", "name"],
+            "description": "Required for multi-instance generic connectors (oidc, oauth2); target is the sign-in-experience key",
+            "properties": { "target": { "type": "string" }, "name": { "type": "string" } }
           },
-          "config": { "type": "object", "description": "Static (non-secret) connector config merged over configEnv values" },
-          "devFallback": { "type": "boolean", "description": "Applied only while no other connector of the same type exists; removed once one does" }
+          "configEnv": { "$ref": "#/definitions/configEnv" },
+          "config": { "type": "object", "description": "Static (non-secret) connector config merged over configEnv values" }
+        }
+      }
+    },
+    "email": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "templates", "providers", "devFallback"],
+      "description": "One Email connector (EM-01). EMAIL_PROVIDER overrides `provider`; incomplete env falls back to devFallback.",
+      "properties": {
+        "provider": { "type": "string" },
+        "templates": {
+          "type": "array",
+          "description": "EM-03 templates, applied to providers with `templates: true`",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["usageType", "subject", "content"],
+            "properties": { "usageType": { "type": "string" }, "subject": { "type": "string" }, "content": { "type": "string" } }
+          }
+        },
+        "providers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["connectorId", "configEnv"],
+            "properties": {
+              "connectorId": { "type": "string" },
+              "templates": { "type": "boolean" },
+              "configEnv": { "$ref": "#/definitions/configEnv" },
+              "config": { "type": "object" }
+            }
+          }
+        },
+        "devFallback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["connectorId", "config"],
+          "description": "Dev/test stand-in applied only while the selected provider's env is incomplete (EM-02)",
+          "properties": { "connectorId": { "type": "string" }, "config": { "type": "object" } }
+        }
+      }
+    },
+    "hooks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "events", "url"],
+        "properties": {
+          "name": { "type": "string", "description": "Stable key; provision matches existing hooks by name" },
+          "events": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+          "url": { "type": "string", "format": "uri" },
+          "enabled": { "type": "boolean", "default": true },
+          "signingKeyEnvOut": { "type": "string", "description": ".env.apps variable that receives the hook signing key" }
         }
       }
     },
@@ -69,7 +211,32 @@
             "favicon": { "type": "string", "description": "Favicon for the hosted sign-in page" }
           }
         },
-        "customCss": { "type": "string", "description": "Raw CSS injected into the hosted sign-in page" }
+        "customCss": { "type": "string", "description": "Raw CSS injected into the hosted sign-in page" },
+        "forgotPasswordMethods": {
+          "type": "array",
+          "items": { "enum": ["EmailVerificationCode", "PhoneVerificationCode"] },
+          "description": "Empty disables password reset"
+        },
+        "socialSignIn": {
+          "type": "object",
+          "properties": { "automaticAccountLinking": { "type": "boolean", "description": "Link social sign-ins to the user with the same verified email" } }
+        },
+        "mfa": {
+          "type": "object",
+          "required": ["factors", "policy"],
+          "properties": {
+            "factors": { "type": "array", "items": { "enum": ["Totp", "WebAuthn", "BackupCode", "EmailVerificationCode", "PhoneVerificationCode"] } },
+            "policy": { "enum": ["Mandatory", "PromptAtSignInAndSignUp", "PromptOnlyAtSignIn", "NoPrompt"] }
+          }
+        },
+        "sentinelPolicy": {
+          "type": "object",
+          "description": "Failed sign-in lockout",
+          "properties": {
+            "maxAttempts": { "type": "integer", "minimum": 1 },
+            "lockoutDuration": { "type": "integer", "minimum": 1, "description": "Minutes" }
+          }
+        }
       }
     },
     "accountCenter": {
@@ -107,6 +274,26 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "customData keys copied into JWT access-token claims by the generated customizer script"
+        },
+        "roles": { "type": "boolean", "description": "Emit a `roles` claim with the user's global role names" }
+      }
+    },
+    "hub": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resource"],
+      "description": "Connector Hub settings; provision ignores this section (the resource itself is declared under `resources`)",
+      "properties": {
+        "resource": { "type": "string", "format": "uri" },
+        "connectors": {
+          "type": "object",
+          "description": "Enable/disable connector definitions by id (EX-05)",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["enabled"],
+            "properties": { "enabled": { "type": "boolean" } }
+          }
         }
       }
     }

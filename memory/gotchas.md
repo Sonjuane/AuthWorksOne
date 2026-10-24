@@ -40,6 +40,15 @@ With `rotateRefreshToken: true`, public clients (`clientAuthMethod: none`) rotat
 ## Resource scopes in access tokens come only from roles
 A requested resource scope appears in `scope` only if one of the user's roles grants it. Hub scopes (`connections:read`, `connections:token`) need a default `user` role that carries them.
 
+## Optional MFA prompt surfaces as `user.suggest_mfa`
+With a `Prompt*` MFA policy, `POST /api/experience/submit` for a user without MFA returns `422 user.suggest_mfa`, not `user.missing_mfa`. Skip it with `POST /api/experience/profile/mfa/mfa-skipped`, then submit again. `Mandatory` still returns `user.missing_mfa`, which can't be skipped.
+
+## Webhook signing key is a field on the hook
+`GET /api/hooks/{id}` returns `signingKey`. `/api/hooks/{id}/signing-key` only accepts `PATCH`, which regenerates the key, and returns 405 on GET.
+
+## Management-API-created users get default roles
+`POST /api/users` applies `isDefault` roles, the same as self sign-up. Only users created before a role became default lack it (provision backfills users with zero roles).
+
 ## `GET /api/logs` page size limit
 `page_size` above 100 → `400 guard.invalid_pagination`. Page with `page=N`.
 

@@ -2,18 +2,24 @@
   "name": "authworks-one",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "up": "docker compose up -d",
-    "down": "docker compose down",
+    "up": "docker compose --profile dev up -d",
+    "down": "docker compose --profile dev down",
     "provision": "node --env-file=.env scripts/provision.js",
-    "mailbox": "node scripts/dev-mailbox.js",
+    "mailbox": "docker compose logs -f mailbox",
     "rotate-keys": "node --env-file=.env scripts/rotate-keys.js",
     "verify:logto": "node --env-file=.env --env-file=.env.apps scripts/verify-logto.js",
+    "test": "node --test test/unit/*.test.js",
+    "test:int": "node --env-file=.env --env-file=.env.apps --test --test-concurrency=1 test/integration/*.test.js",
     "rp": "node --env-file=.env --env-file=.env.apps apps/sample-rp/server.js",
     "profile": "node --env-file=.env --env-file=.env.apps apps/profile-app/server.js"
   },
   "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "jose": "^6",
     "openid-client": "^6"
   }

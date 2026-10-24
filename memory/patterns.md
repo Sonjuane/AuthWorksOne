@@ -16,8 +16,11 @@ Every section of `scripts/provision.js` GETs current state, then POSTs (create) 
 ## Secrets via env indirection in config
 Connector entries map config fields to env var names (`configEnv: {clientId: "GOOGLE_CLIENT_ID"}`); the JSON stays commit-safe and the connector is skipped (with a log line) when env is unset.
 
-## `devFallback` connectors
-A connector marked `devFallback: true` is applied only while no other connector of its type exists, and is deleted automatically once a real one is provisioned. Use for any dev stand-in that must never survive into production config.
+## `devFallback` email connector
+`email.devFallback` (http-email → compose `mailbox`) is applied only while the selected `email.provider` lacks env. Once the provider's env is complete, provision applies the real connector and deletes every other Email connector. Use the same shape for any dev stand-in that must never survive into production config.
+
+## `profiles` for environment-specific entries
+`connectors[]` and `applications[]` entries tagged `profiles: ["test"]` apply only when `SSO_PROFILE` matches (default `dev`). Provision logs `- <name> (profile test)` otherwise. Mock login connectors and test-only clients live here, never in separate config files.
 
 ## Generated-not-authored Logto extension scripts
 The JWT-customizer script is generated from `customJwtClaims.fromCustomData` by `scripts/lib/jwt-script.js`. Anti-pattern: editing the script in the Admin Console (provision overwrites it).

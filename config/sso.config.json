@@ -1,8 +1,48 @@
 {
   "$schema": "./schemas/sso.config.schema.json",
   "resources": [
-    { "name": "AuthWorks Sample API", "indicator": "https://api.authworks.local" }
+    {
+      "name": "AuthWorks Sample API",
+      "indicator": "https://api.authworks.local",
+      "scopes": [{ "name": "read:sample", "description": "Read sample API data" }]
+    },
+    {
+      "name": "Connector Hub",
+      "indicator": "https://hub.authworks.local",
+      "scopes": [
+        { "name": "connections:read", "description": "List consented connections" },
+        { "name": "connections:token", "description": "Get short-lived connection credentials" }
+      ]
+    }
   ],
+  "roles": [
+    {
+      "name": "owner",
+      "description": "Platform owner (Logto Console access)",
+      "permissions": [
+        { "resource": "https://hub.authworks.local", "scopes": ["connections:read", "connections:token"] },
+        { "resource": "https://api.authworks.local", "scopes": ["read:sample"] }
+      ]
+    },
+    {
+      "name": "admin",
+      "description": "Hub administrator",
+      "permissions": [
+        { "resource": "https://hub.authworks.local", "scopes": ["connections:read", "connections:token"] },
+        { "resource": "https://api.authworks.local", "scopes": ["read:sample"] }
+      ]
+    },
+    {
+      "name": "user",
+      "description": "Default role for every user",
+      "isDefault": true,
+      "permissions": [
+        { "resource": "https://hub.authworks.local", "scopes": ["connections:read", "connections:token"] },
+        { "resource": "https://api.authworks.local", "scopes": ["read:sample"] }
+      ]
+    }
+  ],
+  "roleAssignments": [{ "role": "owner", "emailsEnv": "OWNER_EMAILS" }],
   "applications": [
     {
       "key": "sample-rp",
@@ -13,7 +53,38 @@
       "scope": "openid profile email custom_data offline_access",
       "resource": "https://api.authworks.local",
       "redirectUris": ["http://localhost:3010/callback"],
-      "postLogoutRedirectUris": ["http://localhost:3010/"]
+      "postLogoutRedirectUris": ["http://localhost:3010/"],
+      "customClientMetadata": { "rotateRefreshToken": true, "refreshTokenTtlInDays": 14 },
+      "hub": {
+        "allowedConnectors": ["clickup", "hubspot", "wordpress", "google"],
+        "consentReturnUris": ["http://localhost:3010/connections"]
+      }
+    },
+    {
+      "key": "hub-ui",
+      "name": "Connector Hub",
+      "type": "Traditional",
+      "baseUrl": "http://localhost:3030",
+      "port": 3030,
+      "scope": "openid profile email custom_data offline_access",
+      "resource": "https://hub.authworks.local",
+      "redirectUris": ["http://localhost:3030/callback"],
+      "postLogoutRedirectUris": ["http://localhost:3030/"],
+      "customClientMetadata": { "rotateRefreshToken": true, "refreshTokenTtlInDays": 14 }
+    },
+    {
+      "key": "second-client",
+      "name": "Second Client",
+      "type": "Traditional",
+      "profiles": ["test"],
+      "baseUrl": "http://localhost:3011",
+      "port": 3011,
+      "scope": "openid offline_access",
+      "resource": "https://hub.authworks.local",
+      "redirectUris": ["http://localhost:3011/callback"],
+      "postLogoutRedirectUris": ["http://localhost:3011/"],
+      "customClientMetadata": { "rotateRefreshToken": true, "refreshTokenTtlInDays": 14 },
+      "hub": { "allowedConnectors": ["hubspot"], "consentReturnUris": ["http://localhost:3011/connections"] }
     },
     {
       "key": "profile-app",
@@ -33,27 +104,69 @@
       "config": { "scope": "" }
     },
     {
-      "connectorId": "simple-mail-transfer-protocol",
-      "configEnv": {
-        "host": "SMTP_HOST",
-        "port": "SMTP_PORT",
-        "username": "SMTP_USERNAME",
-        "password": "SMTP_PASSWORD",
-        "fromEmail": "SMTP_FROM_EMAIL"
-      },
+      "connectorId": "github-universal",
+      "configEnv": { "clientId": "GITHUB_CLIENT_ID", "clientSecret": "GITHUB_CLIENT_SECRET" }
+    },
+    {
+      "connectorId": "oidc",
+      "profiles": ["test"],
+      "metadata": { "target": "mock-google", "name": "Google (mock)" },
       "config": {
-        "templates": [
-          { "usageType": "SignIn", "subject": "AuthWorks sign-in code: {{code}}", "content": "Your sign-in code is {{code}}.", "contentType": "text/plain" },
-          { "usageType": "Register", "subject": "AuthWorks verification code: {{code}}", "content": "Your verification code is {{code}}.", "contentType": "text/plain" },
-          { "usageType": "ForgotPassword", "subject": "AuthWorks password reset code: {{code}}", "content": "Your password reset code is {{code}}.", "contentType": "text/plain" },
-          { "usageType": "Generic", "subject": "AuthWorks verification code: {{code}}", "content": "Your verification code is {{code}}.", "contentType": "text/plain" }
-        ]
+        "authorizationEndpoint": "http://localhost:3097/oidc/authorize",
+        "tokenEndpoint": "http://mock-provider:3097/oidc/token",
+        "clientId": "mock-google",
+        "clientSecret": "mock",
+        "scope": "openid email profile",
+        "idTokenVerificationConfig": { "jwksUri": "http://mock-provider:3097/oidc/jwks" }
       }
     },
     {
-      "connectorId": "http-email",
-      "devFallback": true,
-      "config": { "endpoint": "http://host.docker.internal:3099/email" }
+      "connectorId": "oidc",
+      "profiles": ["test"],
+      "metadata": { "target": "mock-github", "name": "GitHub (mock)" },
+      "config": {
+        "authorizationEndpoint": "http://localhost:3097/oidc/authorize",
+        "tokenEndpoint": "http://mock-provider:3097/oidc/token",
+        "clientId": "mock-github",
+        "clientSecret": "mock",
+        "scope": "openid email profile",
+        "idTokenVerificationConfig": { "jwksUri": "http://mock-provider:3097/oidc/jwks" }
+      }
+    }
+  ],
+  "email": {
+    "provider": "ses",
+    "templates": [
+      { "usageType": "SignIn", "subject": "AuthWorks sign-in code: {{code}}", "content": "Your sign-in code is {{code}}." },
+      { "usageType": "Register", "subject": "AuthWorks verification code: {{code}}", "content": "Your verification code is {{code}}." },
+      { "usageType": "ForgotPassword", "subject": "AuthWorks password reset code: {{code}}", "content": "Your password reset code is {{code}}." },
+      { "usageType": "Generic", "subject": "AuthWorks verification code: {{code}}", "content": "Your verification code is {{code}}." }
+    ],
+    "providers": {
+      "ses": {
+        "connectorId": "aws-ses-mail",
+        "templates": true,
+        "configEnv": {
+          "accessKeyId": "AWS_SES_ACCESS_KEY_ID",
+          "accessKeySecret": "AWS_SES_SECRET",
+          "region": "AWS_SES_REGION",
+          "emailAddress": "AWS_SES_FROM"
+        }
+      },
+      "cloudflare": {
+        "connectorId": "http-email",
+        "configEnv": { "endpoint": "EMAIL_RELAY_URL", "authorization": "EMAIL_RELAY_TOKEN" }
+      }
+    },
+    "devFallback": { "connectorId": "http-email", "config": { "endpoint": "http://mailbox:3099/email" } }
+  },
+  "hooks": [
+    {
+      "name": "Hub: user deleted",
+      "events": ["User.Deleted"],
+      "url": "http://hub:3030/webhooks/logto",
+      "enabled": false,
+      "signingKeyEnvOut": "HUB_WEBHOOK_SIGNING_KEY"
     }
   ],
   "signInExperience": {
@@ -67,7 +180,11 @@
         { "identifier": "email", "password": true, "verificationCode": false, "isPasswordPrimary": true }
       ]
     },
-    "socialSignInConnectorTargets": ["google"]
+    "socialSignInConnectorTargets": ["google", "github", "mock-google", "mock-github"],
+    "forgotPasswordMethods": ["EmailVerificationCode"],
+    "socialSignIn": { "automaticAccountLinking": true },
+    "mfa": { "factors": ["Totp", "BackupCode"], "policy": "PromptAtSignInAndSignUp" },
+    "sentinelPolicy": { "maxAttempts": 5, "lockoutDuration": 15 }
   },
   "accountCenter": {
     "enabled": true,
@@ -79,12 +196,23 @@
       "password": "Edit",
       "social": "Edit",
       "customData": "Edit",
-      "profile": "Edit"
+      "profile": "Edit",
+      "mfa": "Edit",
+      "session": "Edit"
     }
   },
   "customProfileFields": [
     { "name": "displayName", "type": "Text", "label": "Display name", "description": "Shown to other users across AuthWorks apps", "required": true },
     { "name": "jobTitle", "type": "Text", "label": "Job title", "required": false }
   ],
-  "customJwtClaims": { "fromCustomData": ["displayName", "jobTitle"] }
+  "customJwtClaims": { "fromCustomData": ["displayName", "jobTitle"], "roles": true },
+  "hub": {
+    "resource": "https://hub.authworks.local",
+    "connectors": {
+      "clickup": { "enabled": true },
+      "hubspot": { "enabled": true },
+      "wordpress": { "enabled": true },
+      "google": { "enabled": true }
+    }
+  }
 }
