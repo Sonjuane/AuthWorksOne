@@ -40,6 +40,9 @@ Logto app IDs are generated per environment, so committed config keys apps by `k
 ## 2026-10-24 — Upgrade Logto 1.41 → 1.45 (user request)
 Image `svhd/logto:1.45` (core 1.45.0, latest stable). Ran `db alteration deploy 1.45.0` (16 alterations); pre-upgrade dump in `backup/` (git-ignored). Phase 0 probes re-ran with identical results. The AU-01 gap remains, so the §8 move stands. Supersedes "stay on 1.41" above.
 
+## 2026-10-24 — E2E uses a persistent, hand-bootstrapped test stack (Q2 user choice)
+Playwright (Phase 8) runs against a separate compose project and volume (e.g. `authworks-test`), bootstrapped once by hand like dev (admin + M2M; Logto OSS can't script it). Tests clean up after themselves. It's simple and upgrade-safe, and it's isolated from the dev tenant (mock login connectors stay out of dev). Rejected options: a scripted SQL seed into Logto's tables (couples to its internal schema), snapshot restore (the dump must be regenerated after each upgrade), and reusing the dev tenant. Trade-off: CI can't start from an empty DB.
+
 ## 2026-10-24 — Reference client app (Phase 7; user choices)
 - **Record paths:** the reference app fetches one record at each provider's real path (HubSpot `/crm/v3/objects/contacts?limit=1`, ClickUp `/team`, Drive `/drive/v3/files?pageSize=1`, WP `/wp/v2/posts?per_page=1`). The mock provider serves the same paths, so app code is identical for mock and real. This was chosen over an env-overridable path map.
 - **`second-client` is always provisioned:** its `profiles: ["test"]` tag is dropped, so `npm run rp:second` works in dev. This was chosen over `SSO_PROFILE=test` on the dev tenant, which would also add the mock login buttons, and over a throwaway app per test run.

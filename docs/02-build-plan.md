@@ -674,7 +674,7 @@ URL split: browser-facing authorize URLs use `http://localhost:3097`; container-
 | # | Question | Blocks |
 |---|---|---|
 | Q1 | Cloudflare relay: build it here (Cloudflare Worker with the email-sending binding, or a Node service)? `http-email` sends only `{to, type, payload.code}`, so the relay must render EM-03 templates. | 1.10, EM-01/EM-03 Cloudflare path |
-| Q2 | E2E on a fresh DB needs the manual bootstrap (runbook §2: admin + M2M). Use a persistent, bootstrapped test volume, or seed the M2M app another way? | 8.1, CI |
+| Q2 | **Resolved 2026-10-24 (persistent test volume):** E2E runs against a separate compose project and volume (e.g. `authworks-test`), bootstrapped by hand once (runbook §2) like dev. Tests clean up after themselves. Starting from an empty DB in CI is out of scope. | 8.1, CI |
 | Q3 | **Resolved 2026-10-24:** `POST /v1/credentials` accepts `{connectionId}` or `{connectorId}`. | 5.2, S5 |
 | Q4 | **Resolved 2026-10-24:** `GET /v1/manifest` (generated tools list) only; no MCP JSON-RPC transport. | 3.1 |
 | Q5 | **Resolved 2026-10-24:** `schema_migrations` is runner metadata and has no `tenant_id`. | 2.3 |
