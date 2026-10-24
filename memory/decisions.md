@@ -27,3 +27,18 @@ Profile fields `displayName` / `jobTitle` live in user `customData`, are collect
 
 ## 2026-10-23 — Keep Logto for identity; add a custom Connector Hub for third-party connections
 Spec: `AuthWorksOne_Requirments.md`. Logto covers login, 2FA, roles, SSO, and admin, so only the connector vault is custom. The Hub (Node + Postgres, Vue UI) runs its own connector OAuth flows, stores credentials encrypted, enforces per-app consent, and trusts Logto JWTs issued for the Hub resource. Logto's Secret Vault was rejected because it allows one identity per provider per user and has no per-app consent or API key / app password support. Logto features still unverified on 1.41 are listed as Phase 0 checks (spec §3.0).
+
+## 2026-10-23 — Stay on Logto 1.41; move Account Center audit coverage to spec §8 (user choice)
+Phase 0 (gotchas.md) passed LV-01–LV-08 and the http-email half of LV-09, so no upgrade is needed. LV-06 showed that Account API / Account Center changes are not in Logto's audit log. Per the §3.0 rule, that part of AU-01 moved to spec §8. No custom webhook-based replacement.
+
+## 2026-10-23 — Global MFA policy `PromptAtSignInAndSignUp` (user choice)
+Logto 1.41 has no per-role MFA enforcement (LV-03), and organizations are out of scope for v1. ID-05 uses one global policy: TOTP + backup codes, prompted once at sign-up/sign-in, skippable.
+
+## 2026-10-23 — Per-client Hub settings live under `applications[].hub`, resolved to client IDs at Hub startup (user choice)
+Logto app IDs are generated per environment, so committed config keys apps by `key`. The Hub maps `key` → `<KEY>_CLIENT_ID` from `.env.apps` and enforces HA-05 by real `client_id` at runtime.
+
+## 2026-10-24 — Upgrade Logto 1.41 → 1.45 (user request)
+Image `svhd/logto:1.45` (core 1.45.0, latest stable). Ran `db alteration deploy 1.45.0` (16 alterations); pre-upgrade dump in `backup/` (git-ignored). Phase 0 probes re-ran with identical results. The AU-01 gap remains, so the §8 move stands. Supersedes "stay on 1.41" above.
+
+## 2026-10-23 — Email: AWS SES or Cloudflare relay; SMTP removed (user choice)
+EM-01 picks `aws-ses-mail` or `http-email` → Cloudflare relay through a config `email.provider`. The SMTP connector entry is removed. The `http-email` dev fallback to `scripts/dev-mailbox.js` stays.

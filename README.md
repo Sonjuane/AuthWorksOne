@@ -36,7 +36,7 @@ Sign up at `http://localhost:3010` (verification code prints in the mailbox term
 
 | Path | Contents |
 | --- | --- |
-| [docker-compose.yml](docker-compose.yml) | Logto 1.41 + PostgreSQL 17, named volume, healthchecks |
+| [docker-compose.yml](docker-compose.yml) | Logto 1.45 + PostgreSQL 17, named volume, healthchecks |
 | [config/sso.config.json](config/sso.config.json) | Declarative SSO config: resources, applications, connectors, sign-in experience, account center, custom profile fields, JWT claim mapping |
 | [config/schemas/sso.config.schema.json](config/schemas/sso.config.schema.json) | JSON Schema for the config (editor validation + contract) |
 | [scripts/provision.js](scripts/provision.js) | Idempotent apply of the config via Management API; writes app credentials to `.env.apps` |
@@ -47,6 +47,7 @@ Sign up at `http://localhost:3010` (verification code prints in the mailbox term
 | [apps/sample-rp/server.js](apps/sample-rp/server.js) | Sample third-party app (issuer + client ID/secret only) |
 | [apps/profile-app/server.js](apps/profile-app/server.js) | Custom-branded profile editor against the Account API |
 | [docs/01-runbook.md](docs/01-runbook.md) | Operations: bootstrap, add an app, connectors, key rotation, backup/restore, secrets, production |
+| [docs/02-build-plan.md](docs/02-build-plan.md) | Build plan for the Logto extensions + Connector Hub: Phase 0 results, phases/tasks, traceability matrix, Hub design, API outline, config changes, test plan, open questions |
 | [memory/](memory/) | LLM wiki (architecture, decisions, patterns, gotchas, domain) |
 
 ## Change workflows

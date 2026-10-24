@@ -1,6 +1,6 @@
 services:
   logto:
-    image: svhd/logto:1.41
+    image: svhd/logto:1.45
     depends_on:
       postgres:
         condition: service_healthy

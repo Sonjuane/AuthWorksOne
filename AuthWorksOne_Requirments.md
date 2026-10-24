@@ -9,7 +9,7 @@
 | Area | Decision |
 | --- | --- |
 | System shape | Two services. **Logto** handles identity (OIDC provider). The **Connector Hub** handles the connector vault, consent, and token API, and trusts Logto-issued JWTs. |
-| Identity core | Logto OSS, Docker image `svhd/logto:1.41` (already in repo). Configured as code via `config/sso.config.json` plus `npm run provision`. Upgrades are deliberate, and only when a Section 3.0 verification item requires one. |
+| Identity core | Logto OSS, Docker image `svhd/logto:1.45` (upgraded from 1.41 on 2026-10-24). Configured as code via `config/sso.config.json` plus `npm run provision`. Upgrades are deliberate, and only when a Section 3.0 verification item requires one. |
 | Tenancy | Single-tenant in v1. Logto Organizations are the planned multi-tenant path. Hub tables carry `tenant_id` from day one. |
 | Connector data access | Token vault. An app requests short-lived provider credentials from the Hub, then calls the provider itself. |
 | Connection ownership | Connections belong to the user. Each client app needs the user's consent per connection. |
@@ -47,7 +47,7 @@
 
 ### 3.0 Logto Verification (Phase 0 — do first)
 
-Before planning dependent work, verify each item against the running Logto 1.41 container. Record each result in `memory/gotchas.md`.
+Before planning dependent work, verify each item against the running Logto container (verified on 1.41 and 1.45). Record each result in `memory/gotchas.md`.
 
 - **LV-01:** Automatic account linking by verified email works for Google + GitHub + email/password (ID-03).
 - **LV-02:** TOTP + backup codes can be enabled via the Management API, and users can enroll from the sign-in flow or Account Center.
@@ -252,7 +252,8 @@ All identity requirements are met through Logto and applied as code (`config/sso
 - Proxy mode and scheduled data sync for connectors
 - WordPress.com OAuth (self-hosted app passwords only)
 - Formal compliance (SOC 2, HIPAA)
-- Any requirement moved here by a failed Section 3.0 verification item
+- Any requirement moved here by a failed Section 3.0 verification item:
+  - **AU-01 (part):** Audit entries for 2FA, profile, and social-link changes made in Logto Account Center or the Account API. Logto 1.41 and 1.45 do not audit-log these (LV-06). Sign-in-flow logins, 2FA binding, and account linking stay in AU-01.
 
 ---
 
