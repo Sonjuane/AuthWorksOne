@@ -13,6 +13,9 @@ services:
       - DB_URL=postgres://logto:${POSTGRES_PASSWORD}@postgres:5432/logto
       - ENDPOINT=${LOGTO_ENDPOINT:-http://localhost:3001}
       - ADMIN_ENDPOINT=${LOGTO_ADMIN_ENDPOINT:-http://localhost:3002}
+      # Logto blocks outbound webhook calls to private addresses; allow only this stack's network
+      # (User.Deleted -> http://hub:3030/webhooks/logto).
+      - SSRF_ALLOWED_ADDRESSES=${COMPOSE_SUBNET:-172.31.240.0/24}
     restart: unless-stopped
 
   postgres:
@@ -84,6 +87,12 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${COMPOSE_SUBNET:-172.31.240.0/24}
 
 volumes:
   pgdata:

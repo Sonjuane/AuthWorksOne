@@ -69,6 +69,7 @@ export function startApp({ name, port, routes, sessionStore = memorySessionStore
       html: (body, status = 200) => send(status, { 'Content-Type': 'text/html; charset=utf-8' }, body),
       json: (body, status = 200) => send(status, { 'Content-Type': 'application/json; charset=utf-8' }, JSON.stringify(body)),
       form: async () => Object.fromEntries(new URLSearchParams(await readBody(req))),
+      text: () => readBody(req),
       body: async () => {
         const text = await readBody(req);
         return text ? JSON.parse(text) : {};

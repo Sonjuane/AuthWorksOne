@@ -35,7 +35,7 @@ Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only
 | `http://localhost:3010` | Sample RP: PKCE login, ID-token/userinfo/JWT-access-token views, SSO logout |
 | `http://localhost:3020` | Custom profile UI: edits name/avatar/custom fields via the Account API |
 | `http://localhost:3099` | Dev mailbox container: JSON list of received emails (`npm run mailbox` tails it) |
-| `http://localhost:3030` | Connector Hub: `/login`, `/connect/start`, `/ui-api/*` (JSON for the Hub UI), `/health`, `/openapi.json` (Vue UI and app API arrive in later build phases) |
+| `http://localhost:3030` | Connector Hub: app API `/v1/connections`, `/v1/credentials`; `/login`, `/connect/start`, `/ui-api/*` (JSON for the Hub UI), `/webhooks/logto`, `/health`, `/openapi.json` (the Vue UI arrives in Phase 6) |
 | `http://localhost:3097` | Mock provider (compose profile `test`): OAuth 2.0 + APIs + `/_control/*` |
 
 ## Repository map
@@ -50,7 +50,7 @@ Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only
 | [scripts/rotate-keys.js](scripts/rotate-keys.js) | OIDC signing-key rotation + JWKS verification |
 | [scripts/dev-mailbox.js](scripts/dev-mailbox.js) | Dev-only receiver for the `http-email` fallback connector |
 | [scripts/verify-logto.js](scripts/verify-logto.js) | Live LV-01–LV-09 checks; restores the tenant |
-| [scripts/hub-db-init.js](scripts/hub-db-init.js), [scripts/hub-migrate.js](scripts/hub-migrate.js), [scripts/hub-reencrypt.js](scripts/hub-reencrypt.js) | Hub role/database creation, migrations, master-key re-encryption (idempotent) |
+| [scripts/hub-db-init.js](scripts/hub-db-init.js), [scripts/hub-migrate.js](scripts/hub-migrate.js), [scripts/hub-reencrypt.js](scripts/hub-reencrypt.js), [scripts/hub-reconcile.js](scripts/hub-reconcile.js) | Hub role/database creation, migrations, master-key re-encryption, deleted-user reconciliation |
 | [scripts/lib/](scripts/lib/) | Management API client; JWT-customizer script generator; Experience API sign-in driver; mock OIDC IdP; TOTP |
 | [test/](test/) | `unit/` (config schema, generated scripts, Hub core + registry + OpenAPI, repo hygiene), `contract/` (EX-06 suites), `integration/` (live tenant, Hub database), `mock-provider/` (mock OAuth/API provider), `fixtures/` |
 | [apps/lib/](apps/lib/) | Shared utilities: OIDC relying-party helper (PKCE, JWKS verify, logout), access-token verifier (`jwt.js`), minimal HTTP/session/HTML helper (pluggable session store) |
@@ -73,6 +73,8 @@ Checks: `npm test` (unit + contract), `npm run test:contract` (EX-06 suites only
 - **Rotate signing keys**: `npm run rotate-keys` ([docs/01-runbook.md §5](docs/01-runbook.md)).
 - **Verify Logto features (before any image upgrade)**: `npm run verify:logto` (needs `.env.apps` from provision). It runs the LV-01–LV-09 checks live and restores the tenant afterwards; any `FAIL` or `tenant CHANGED` blocks the upgrade.
 - **Add a Hub connector or auth type**: new file in `apps/hub/connectors/` or `apps/hub/auth-types/` → `npm run test:contract` → restart the Hub ([docs/03-hub-extensions.md](docs/03-hub-extensions.md)).
+- **Let an app use the Hub**: add a `hub` block (`allowedConnectors`, `consentReturnUris`) to its `applications[]` entry → `npm run provision` → restart the Hub. The app calls `POST /v1/credentials` with a Logto token for `https://hub.authworks.local` ([docs/01-runbook.md §4b](docs/01-runbook.md)).
+- **Clean up after Hub downtime**: `npm run hub:reconcile -- --dry-run`, then without `--dry-run` (removes data of users deleted in Logto).
 - **Rotate the Hub master key**: add `v2:<key>` to `HUB_MASTER_KEYS`, set `HUB_MASTER_KEY_CURRENT=v2`, `npm run hub:reencrypt` ([docs/01-runbook.md §4b](docs/01-runbook.md)).
 - **Backup / restore**: [docs/01-runbook.md §6](docs/01-runbook.md).
 

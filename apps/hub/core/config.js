@@ -54,7 +54,8 @@ export function loadConfig({ env = process.env, sso = JSON.parse(readFileSync(ss
   const logtoInternal = (env.LOGTO_INTERNAL_ENDPOINT ?? logto).replace(/\/$/, '');
   return {
     production,
-    tenantId: 'default',
+    // v1 is single-tenant (NF-03); HUB_TENANT_ID only isolates test runs.
+    tenantId: env.HUB_TENANT_ID ?? 'default',
     port: Number(env.HUB_PORT ?? ui?.port ?? 3030),
     baseUrl,
     issuer: `${logto}/oidc`,

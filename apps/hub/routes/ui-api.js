@@ -19,7 +19,32 @@ const write = (handler) => async (ctx) => {
   return respond(ctx, await handler({ user, body: await readBody(ctx), context: requestContext(ctx) }));
 };
 
-export const uiApiRoutes = ({ connections }) => ({
+export const uiApiRoutes = ({ connections, consents }) => ({
+  // Consent page data (TV-02): ?client_id=…&connection_id=… | &connector=…, optional &return_to=…
+  'GET /ui-api/consent': async (ctx) => {
+    const user = requireUser(ctx);
+    const params = ctx.url.searchParams;
+    return respond(ctx, await consents.describe({
+      sub: user.sub,
+      clientId: params.get('client_id'),
+      connectionId: params.get('connection_id') ?? undefined,
+      connectorId: params.get('connector') ?? undefined,
+      returnTo: params.get('return_to') ?? undefined,
+    }));
+  },
+
+  // { clientId, connectionId, returnTo } -> { redirectTo } (a registered consent return URI only).
+  'POST /ui-api/consent': write(({ user, body, context }) =>
+    consents.grant({ sub: user.sub, clientId: body.clientId, connectionId: body.connectionId, returnTo: body.returnTo, context })),
+
+  // App access (UI-03, TV-03)
+  'GET /ui-api/grants': async (ctx) => respond(ctx, await consents.list(requireUser(ctx).sub)),
+
+  'POST /ui-api/grants/revoke': write(async ({ user, body, context }) => {
+    await consents.revoke({ sub: user.sub, grantId: body.grantId, context });
+    return { revoked: body.grantId };
+  }),
+
   'GET /ui-api/session': (ctx) => respond(ctx, { user: ctx.session.user ?? null, csrf: ctx.session.user ? ctx.session.csrf : null }),
 
   'GET /ui-api/connectors': (ctx) => {

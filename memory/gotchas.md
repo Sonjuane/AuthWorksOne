@@ -52,6 +52,12 @@ With a `Prompt*` MFA policy, `POST /api/experience/submit` for a user without MF
 ## Containers can't use the public issuer URL for server-to-server calls
 `LOGTO_ENDPOINT=http://localhost:3001` is the token `iss` and the browser URL, but `localhost` inside a container is the container itself. Fetch the JWKS (and later token endpoints) via `LOGTO_INTERNAL_ENDPOINT=http://logto:3001`, while still validating `iss` against the public issuer.
 
+## Logto 1.45 blocks webhooks to private addresses
+Hook deliveries go through `ssrfProtectedFetch`. `http://hub:3030/...` fails with `hook.send_test_payload_failed: fetch failed`. `SSRF_ALLOWED_ADDRESSES` (CIDR list) on the `logto` service fixes it; the compose network is pinned (`COMPOSE_SUBNET`) so the allowlist is exact. `SSRF_PROTECTION_DISABLED` also exists, but it disables protection entirely. Either one disables Logto's CIMD feature (unused here). Signature: `logto-signature-sha-256` = hex HMAC-SHA256 of `JSON.stringify(payload)`; the `User.Deleted` payload carries `user.id` and `params.userId`.
+
+## Every Logto user deletion hits the Hub webhook
+Tests and the verifier create and delete many throwaway users. `purgeUser` audits `user.deleted` only when the user had Hub data; otherwise the default tenant's append-only audit log fills with noise.
+
 ## Logto discovery endpoints follow the request Host
 Fetching `/oidc/.well-known/openid-configuration` from `http://logto:3001` returns `issuer` = the public `ENDPOINT`, but `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and `end_session_endpoint` all come back on `http://logto:3001`. Server-side calls can use those directly. URLs sent to a browser must be rewritten to the public origin (`apps/lib/oidc.js` `internalOrigin`).
 

@@ -21,10 +21,12 @@ export function createAuthenticator({ verify, clients }) {
     } catch {
       throw new ApiError(401, 'invalid_token', 'Access token is invalid, expired, or for another audience');
     }
+    // Verified claims ride on later errors (for audit) but never in the response body.
+    const reject = (status, code, message) => Object.assign(new ApiError(status, code, message), { claims });
     const scopes = new Set(String(claims.scope ?? '').split(' ').filter(Boolean));
-    if (!scopes.has(requiredScope)) throw new ApiError(403, 'insufficient_scope', `Requires scope ${requiredScope}`);
+    if (!scopes.has(requiredScope)) throw reject(403, 'insufficient_scope', `Requires scope ${requiredScope}`);
     const client = clients.get(claims.client_id);
-    if (!client) throw new ApiError(403, 'client_not_registered', 'The calling application is not registered with the Hub');
+    if (!client) throw reject(403, 'client_not_registered', 'The calling application is not registered with the Hub');
     return { sub: claims.sub, clientId: claims.client_id, client, scopes, roles: claims.roles ?? [] };
   };
 }

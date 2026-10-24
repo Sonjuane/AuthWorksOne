@@ -21,6 +21,11 @@ last_updated: 2026-10-24
   - **Refresh:** `issue()` refreshes within 5 minutes of expiry under `pg_advisory_xact_lock(tenant:connection)`. A rejected refresh sets `needs_reauth`; `remove()` revokes at the provider, then deletes.
   - **Routes:** `routes/auth.js` (Hub UI Logto login), `routes/connect.js` (browser OAuth legs), and `routes/ui-api.js` (session JSON API; CSRF on writes).
   - **Outbound HTTP:** all provider calls go through `core/http-client.js` (SSRF guard).
+- **Hub consent, API, deletion (Phase 5)**:
+  - `core/consent.js`: grants per (user, client_id, connection), exact-match return URIs, consent-page data.
+  - `routes/api.js`: `/v1/connections`, `/v1/credentials`, validated against `openapi.json` via `core/schema.js`; rejections audited as `api.reject`.
+  - `routes/webhooks.js`: Logto `User.Deleted` with HMAC check.
+  - `core/users.js`: `purgeUser` and `findOrphans`, shared by the webhook and `scripts/hub-reconcile.js`.
 - **Identity config (Phase 1)** — global roles `owner`/`admin`/`user` (`user` default) grant API resource scopes. The Hub resource is `https://hub.authworks.local` (`connections:read`, `connections:token`). The generated JWT customizer emits `roles` plus mapped customData. MFA is TOTP + backup codes, `PromptAtSignInAndSignUp`. The `User.Deleted` webhook targets the Hub (disabled until the Hub exists).
 
 ## Invariants

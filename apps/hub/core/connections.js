@@ -182,6 +182,9 @@ export function createConnections({ sql, vault, registry, tenantId, http, baseUr
       return toUiConnection(row);
     },
 
+    // Owned connection row, or connection_not_found (also for other users' ids: no enumeration).
+    get: (sub, connectionId) => owned(sub, connectionId),
+
     list: async (sub) => (await sql`select * from connections where tenant_id = ${tenantId} and sub = ${sub} order by created_at`).map(toUiConnection),
 
     async relabel({ sub, connectionId, label }) {

@@ -40,6 +40,12 @@ Logto app IDs are generated per environment, so committed config keys apps by `k
 ## 2026-10-24 — Upgrade Logto 1.41 → 1.45 (user request)
 Image `svhd/logto:1.45` (core 1.45.0, latest stable). Ran `db alteration deploy 1.45.0` (16 alterations); pre-upgrade dump in `backup/` (git-ignored). Phase 0 probes re-ran with identical results. The AU-01 gap remains, so the §8 move stands. Supersedes "stay on 1.41" above.
 
+## 2026-10-24 — Consent, app API, deletion (Phase 5; Q9 user choice A)
+- **Q9: reconciliation is an operator command** (`npm run hub:reconcile`) using the provisioner's Management API credentials. The Hub never holds Logto admin rights, because OSS Management API access is all-or-nothing. Safety rails: `--dry-run`; abort on an empty Logto list or more than 20% missing unless `--force`.
+- **Webhook reachability:** the compose network subnet is pinned, and Logto's `SSRF_ALLOWED_ADDRESSES` is set to exactly that subnet. This was chosen over `SSRF_PROTECTION_DISABLED` or allowing all private ranges.
+- **One-connection rule:** `POST /v1/credentials {connectorId}` resolves only when exactly one connection is consented. Several → `invalid_request` with the list, so the app must pass `connectionId`.
+- **Consent page:** the backend is a JSON UI API now; the Vue page arrives in Phase 6 (no throwaway server-rendered page).
+
 ## 2026-10-24 — Connections and Hub login (Phase 4)
 - **SSRF default (user-approved):** provider URLs must be https and resolve to public addresses. `HUB_ALLOW_PRIVATE_URLS=1` relaxes this for dev/test and is refused in production.
 - **Hub UI login moved earlier:** it was built in Phase 4 (task 6.2) because connect flows need a signed-in user.

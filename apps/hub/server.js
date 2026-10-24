@@ -1,11 +1,13 @@
 // Connector Hub service entry point: validate config and secrets, require an up-to-date schema,
 // then serve HTTP. Refuses to start (exit 1) when anything required is missing (NF-05).
+import { createVerifier } from '../lib/jwt.js';
 import { createOidc } from '../lib/oidc.js';
 import { startApp } from '../lib/web.js';
 import { createAudit } from './core/audit.js';
-import { ApiError } from './core/auth.js';
+import { ApiError, createAuthenticator } from './core/auth.js';
 import { ConfigError, loadConfig } from './core/config.js';
 import { createConnections } from './core/connections.js';
+import { createConsents } from './core/consent.js';
 import { connect, pendingMigrations } from './core/db.js';
 import { createHttpClient } from './core/http-client.js';
 import { errorHandler, respond, respondError, securityHeaders } from './core/http.js';
@@ -13,11 +15,15 @@ import { createLogger } from './core/log.js';
 import { buildManifest, loadOpenApi } from './core/manifest.js';
 import { migrationFiles } from './core/migrate.js';
 import { DEFAULT_AUTH_TYPE_DIRS, DEFAULT_CONNECTOR_DIRS, dirsFromEnv, loadRegistry, RegistryError } from './core/registry.js';
+import { openApiValidator } from './core/schema.js';
 import { createSessionStore } from './core/session-store.js';
+import { purgeUser } from './core/users.js';
 import { createVault } from './core/vault.js';
+import { apiRoutes } from './routes/api.js';
 import { authRoutes } from './routes/auth.js';
 import { connectRoutes } from './routes/connect.js';
 import { uiApiRoutes } from './routes/ui-api.js';
+import { webhookRoutes } from './routes/webhooks.js';
 
 const log = createLogger({ base: { service: 'hub' } });
 const fail = (reason) => {
@@ -80,6 +86,7 @@ const oidc = await createOidc({
   internalOrigin: config.logtoInternalOrigin,
 }).catch((err) => fail(`Logto discovery failed: ${err.message}`));
 
+const audit = createAudit({ sql, tenantId: config.tenantId, redact: log.redact });
 const connections = createConnections({
   sql,
   vault,
@@ -87,9 +94,15 @@ const connections = createConnections({
   tenantId: config.tenantId,
   http: createHttpClient({ allowPrivate: config.allowPrivateUrls }),
   baseUrl: config.baseUrl,
-  audit: createAudit({ sql, tenantId: config.tenantId, redact: log.redact }),
+  audit,
   log,
 });
+const consents = createConsents({ sql, tenantId: config.tenantId, clients: config.clients, registry, baseUrl: config.baseUrl, audit });
+const authenticate = createAuthenticator({
+  verify: createVerifier({ issuer: config.issuer, audience: config.resource, jwksUri: config.jwksUri }),
+  clients: config.clients,
+});
+const onUserDeleted = ({ sub, context }) => purgeUser({ sql, tenantId: config.tenantId, connections, audit, sub, source: 'webhook', context });
 
 startApp({
   name: 'Connector Hub',
@@ -114,8 +127,10 @@ startApp({
     },
     'GET /openapi.json': (ctx) => ctx.json(openApi),
     'GET /v1/manifest': (ctx) => respond(ctx, manifest),
+    ...apiRoutes({ authenticate, connections, consents, audit, validate: openApiValidator(openApi) }),
     ...authRoutes({ oidc, baseUrl: config.baseUrl }),
     ...connectRoutes({ connections }),
-    ...uiApiRoutes({ connections }),
+    ...uiApiRoutes({ connections, consents }),
+    ...webhookRoutes({ signingKey: config.webhookSigningKey, onUserDeleted, log }),
   },
 });

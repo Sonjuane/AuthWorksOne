@@ -165,7 +165,7 @@
       "name": "Hub: user deleted",
       "events": ["User.Deleted"],
       "url": "http://hub:3030/webhooks/logto",
-      "enabled": false,
+      "enabled": true,
       "signingKeyEnvOut": "HUB_WEBHOOK_SIGNING_KEY"
     }
   ],

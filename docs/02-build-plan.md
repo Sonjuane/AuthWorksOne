@@ -146,6 +146,16 @@ Changes from the task list:
 
 ### Phase 5 — Consent, token API, audit, deletion
 
+**Status 2026-10-24: done (5.1–5.5, plus reconciliation).** Proof:
+- `npm test` 99/99; `npm run test:int` 47 passed, 1 skipped (opt-in); `verify:logto` 9/9.
+- `hub-api.test.js` runs a second Hub process with real Logto tokens from three clients and covers S5, S6, S7, S8, S10, S11, S14, S15, AU-02/03, the webhook HMAC check, and `hub:reconcile`. S15 is end to end: deleting a user in Logto made the compose Hub purge their data within about 0.3 s.
+
+Changes and findings:
+- **Logto 1.45 blocks webhook delivery to private addresses** (`ssrfProtectedFetch`). The compose network is now pinned (`COMPOSE_SUBNET`, default `172.31.240.0/24`), and the `logto` service sets `SSRF_ALLOWED_ADDRESSES` to exactly that subnet. In production, a public HTTPS hook URL needs no allowlist.
+- **Consent page backend** is done (`GET/POST /ui-api/consent`, `GET /ui-api/grants`, `POST /ui-api/grants/revoke`). The `/consent` browser page is Vue (task 6.4).
+- **`user.deleted` is audited only when the user had Hub data**, since every Logto user deletion triggers the webhook.
+- **`HUB_TENANT_ID`** exists for test isolation only.
+
 | Task | Reqs | Files | Done check |
 |---|---|---|---|
 | 5.1 Consent model + consent backend (app name from `applications[].name`; exact-match return URI) | TV-01, TV-02 | `apps/hub/core/consent.js`, `apps/hub/routes/ui-api.js` | S5, S6, S11 (return URI refused). |
@@ -647,7 +657,7 @@ URL split: browser-facing authorize URLs use `http://localhost:3097`; container-
 | Q6 | **Resolved 2026-10-24:** `roleAssignments[]` with emails from env (`OWNER_EMAILS`); the Console stays for ad-hoc assignment. | 1.12, S9 |
 | Q7 | **Resolved 2026-10-24:** `maxAttempts: 5`, `lockoutDuration: 15` (minutes). | 1.3 |
 | Q8 | **Resolved 2026-10-24:** `postgres` (porsager, zero deps) driver; Hub UI built with Vite + `@vitejs/plugin-vue` + Tailwind v4. | 2.1, 6.1 |
-| Q9 | A `User.Deleted` webhook missed while the Hub is down leaves orphaned connections. Add reconciliation (not in spec), or accept? | 5.4, VA-08 |
+| Q9 | **Resolved 2026-10-24 (option A):** `npm run hub:reconcile` (operator command, provisioner M2M credentials; the Hub holds no Logto admin rights). Has `--dry-run`, and refuses an empty Logto list or more than 20% missing users without `--force`. | 5.4, VA-08 |
 | Q10 | Provision never deletes. Retiring `profile-app` leaves its Logto app; delete it manually in the Console or add `-` removal for config-dropped apps? | 6.7, AD-02 |
 | Q11 | **Resolved 2026-10-24:** provision gives `isDefault` roles to existing users with no roles. | 1.1 |
 | Q12 | **Resolved 2026-10-24:** TV-05 response adds `authType` and `auth`; errors add `invalid_token`, `insufficient_scope`, `provider_unavailable`, plus `invalid_request`, `not_found`, `internal_error`. | 3.1, 5.2 |
