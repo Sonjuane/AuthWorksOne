@@ -91,8 +91,8 @@ With an in-process mock answering refreshes in ~1 ms, 20 concurrent `issue()` ca
 ## Email sign-up identifier hard-requires an Email connector
 `PATCH /api/sign-in-exp` rejects `signUp.verify: false` for email identifiers (`passwordless_requires_verify`), and verification needs a connector. There is no mock email connector in the production OSS image — the `http-email` factory + local mailbox is the dev workaround.
 
-## Logto 1.41 Account Center has no `/account/profile` page
-Only security/email/username/password pages exist; the docs describe a newer version. Custom fields are still editable via Account API (`PATCH /api/my-account` with `customData`) — that PATCH replaces `customData` wholesale, so merge client-side first.
+## Account Center `/account/profile` is hidden unless `profileFields` is set (1.45)
+The 1.45 Account Center has a "Personal info" page at `/account/profile`, but it renders (and shows in the nav) only when `accountCenter.profileFields` lists at least one field whose control (`name`, `avatar`, `profile` or `customData`, by field type) is not `Off`. Our config sets no `profileFields` (tenant: `null`), so the page shows "Page not found" and the nav has only Security and Sessions. Verified 2026-10-26 in the bundle (`hasVisibleProfilePage`) and in a browser. Kept hidden on purpose (Q14); profile editing is the Hub UI Account page. Custom fields are editable via Account API (`PATCH /api/my-account` with `customData`) — that PATCH replaces `customData` wholesale, so merge client-side first.
 
 ## Opaque vs JWT access tokens
 No `resource` in the request → opaque token (works for `userinfo` and Account API). With `resource` → JWT for that audience only. To hold both, request `offline_access` (+ `prompt=consent`) and mint the resource JWT via refresh grant.

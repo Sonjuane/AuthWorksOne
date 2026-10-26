@@ -150,7 +150,7 @@ Also back up `.env` (contains the only copy of the M2M credentials and Postgres 
 | Hub log `startup_failed … Missing required env vars` | Set the listed vars in `.env`; `HUB_UI_*` / `HUB_WEBHOOK_SIGNING_KEY` come from `npm run provision` (`.env.apps`). |
 | `npm run hub` fails with `EADDRINUSE :3030` | The compose `hub` service is running; stop it (`docker compose stop hub`) or use it instead. |
 | `npm run verify:logto` LV-01 fails to reach the mock IdP | Logto calls the in-process mock at `host.docker.internal:3098`. Linux: add `extra_hosts: ["host.docker.internal:host-gateway"]` to the `logto` service. |
-| `/account/profile` returns Page not found | Profile + custom fields editing is in the Hub UI Account page (`:3030/account`); Logto Account Center handles security settings only. |
+| `/account/profile` returns Page not found | Expected: config sets no `accountCenter.profileFields`, so Logto hides its Personal info page (Q14). Profile + custom fields editing is in the Hub UI Account page (`:3030/account`); Logto Account Center handles security settings and sessions. |
 | Hub UI shows JSON `not_found` instead of the app | UI not built: `npm run hub:ui:build` (host) or rebuild the image (`docker compose up -d --build hub`). The Hub logs `ui_not_built` at startup. |
 | Custom claims missing from access token | Claims apply only to resource-bound JWT access tokens (request with `resource=`); the default opaque token shows claims via `userinfo` `custom_data` instead. Check Console → Custom JWT for script errors. |
 | M2M token 401 | `LOGTO_M2M_CLIENT_*` wrong or the app lost the **Logto Management API access** role (Console → Applications → Provisioner → Roles). |

@@ -701,7 +701,7 @@ URL split: browser-facing authorize URLs use `http://localhost:3097`; container-
 | Q11 | **Resolved 2026-10-24:** provision gives `isDefault` roles to existing users with no roles. | 1.1 |
 | Q12 | **Resolved 2026-10-24:** TV-05 response adds `authType` and `auth`; errors add `invalid_token`, `insufficient_scope`, `provider_unavailable`, plus `invalid_request`, `not_found`, `internal_error`. | 3.1, 5.2 |
 | Q13 | **Resolved 2026-10-24:** TTL-gated rotation satisfies ID-09. | 1.6 |
-| Q14 | The 1.41.0 Account Center bundle contains a `/profile` route, while `memory/gotchas.md` says it is missing. Re-check in a browser; the gotcha may be stale (no scope impact: profile editing is in the Hub UI per UI-01). | 6.3 |
+| Q14 | **Resolved 2026-10-26 (keep hidden):** the gotcha was stale. On 1.45, `/account/profile` (Personal info) exists but renders only when `accountCenter.profileFields` is set; config leaves it unset, so the page stays hidden and profile editing stays in the Hub UI (UI-01). Gotcha and runbook troubleshooting row corrected; no code change. | 6.3 |
 
 ### Risks
 

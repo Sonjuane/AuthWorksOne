@@ -98,3 +98,6 @@ EM-01 picks `aws-ses-mail` or `http-email` → Cloudflare relay through a config
 
 ## 2026-10-26 — Q1: Cloudflare email relay is a Node service (user choice)
 `apps/email-relay` runs as compose `email-relay` (profile `cloudflare`, :3096, no published port) and sends through the Cloudflare Email Sending **REST API** (API token), not a Worker `send_email` binding. Same stack as the repo, no wrangler/deploy step, templates read from `config/sso.config.json` at runtime (EM-03 stays single-source), unit-testable with an injected `fetch`. Tested against a mocked API only; the live send waits for `CF_*` credentials (LV-09 skips until then, same pattern as SES).
+
+## 2026-10-26 — Q14: keep Logto's Account Center profile page hidden (user choice)
+Logto 1.45 can show an Account Center "Personal info" page when `accountCenter.profileFields` is set. Config leaves it unset, so profile and custom-field editing stays in one place: the Hub UI Account page (UI-01). Chosen over enabling it via config, which would make the profile editable in two places and add schema/provision/test work.
