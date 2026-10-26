@@ -42,7 +42,13 @@ Provision output legend: `+` created, `=` exists/updated, `-` skipped (with reas
 - **GitHub**: create a GitHub OAuth app (callback URI as shown in Console → Connectors → GitHub, `$LOGTO_ENDPOINT/callback/<connector id>`). Set `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` → `npm run provision`. The `github` button appears automatically.
 - **Email (config `email`)**: one Email connector, chosen by `EMAIL_PROVIDER` or `email.provider` (`ses` | `cloudflare`).
   - **AWS SES**: set `AWS_SES_ACCESS_KEY_ID`, `AWS_SES_SECRET`, `AWS_SES_REGION`, `AWS_SES_FROM` → `npm run provision`. Expect `+ aws-ses-mail (ses)` and `- http-email (removed …)`. Templates come from `email.templates` (SignIn, Register, ForgotPassword, Generic are all required).
-  - **Cloudflare**: `EMAIL_PROVIDER=cloudflare`, `EMAIL_RELAY_URL`, `EMAIL_RELAY_TOKEN`. The relay is not built yet (build plan Q1).
+  - **Cloudflare** (Logto `http-email` → compose `email-relay` :3096 → Cloudflare Email Sending REST API):
+    1. Onboard the sender domain: `npx wrangler email sending enable <domain>` (or Dashboard → Email Service). Create an API token with Email Sending send permission; note the account ID.
+    2. `.env`: `EMAIL_PROVIDER=cloudflare`, `EMAIL_RELAY_URL=http://email-relay:3096/email`, `EMAIL_RELAY_TOKEN="Bearer <random secret>"` (full header value; Logto sends it verbatim), `EMAIL_RELAY_FROM=<address on the domain>`, `CF_ACCOUNT_ID`, `CF_EMAIL_API_TOKEN`.
+    3. `docker compose --profile dev --profile cloudflare up -d` → `email-relay` healthy (it exits with `env vars not set: …` when any relay var is missing).
+    4. `npm run provision` → expect `= http-email (cloudflare)`.
+    5. Verify: set `CF_TEST_RECIPIENT` → `npm run verify:logto -- --only LV-09` → `cloudflare: test email sent to …`. Failures show in `docker compose logs email-relay` (`send failed: <status> <Cloudflare errors>`); Logto gets a 502 with the same errors.
+    - Templates come from `email.templates` (relay restart picks up edits; `Generic` covers usage types without a template).
   - **Dev fallback**: with the chosen provider's env incomplete, provision logs `- <provider> (env vars not set …)` and applies `http-email` → compose `mailbox` service (`http://mailbox:3099/email`, started by `npm run up`). Read codes with `npm run mailbox` or `GET http://localhost:3099/`. Dev/test only; never expose it.
 
 ## 4a. Roles, permissions, and webhooks

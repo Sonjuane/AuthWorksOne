@@ -48,6 +48,26 @@ services:
       - "3099:3099"
     restart: unless-stopped
 
+  # Cloudflare email relay (EMAIL_PROVIDER=cloudflare): Logto's http-email connector posts to
+  # http://email-relay:3096/email; templates come from config. Opt-in: `--profile cloudflare`.
+  email-relay:
+    image: node:22-alpine
+    profiles: ["cloudflare"]
+    command: ["node", "/app/apps/email-relay/server.js"]
+    env_file:
+      - .env
+    volumes:
+      - ./package.json:/app/package.json:ro
+      - ./apps/email-relay:/app/apps/email-relay:ro
+      - ./apps/lib:/app/apps/lib:ro
+      - ./config:/app/config:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3096/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
   # Test only: mock third-party provider (OAuth 2.0 server + APIs + control API) for E2E.
   mock-provider:
     image: node:24-alpine

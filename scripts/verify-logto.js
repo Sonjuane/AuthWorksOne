@@ -86,18 +86,15 @@ const mailCode = async (to, type) => {
   return null;
 };
 
-// SES live send via the connector test endpoint; skipped without credentials (task 0.3).
-const sesCheck = async () => {
-  const sesConfig = {
-    accessKeyId: process.env.AWS_SES_ACCESS_KEY_ID,
-    accessKeySecret: process.env.AWS_SES_SECRET,
-    region: process.env.AWS_SES_REGION,
-    emailAddress: process.env.AWS_SES_FROM,
-  };
-  const to = process.env.SES_TEST_RECIPIENT;
-  if (!to || Object.values(sesConfig).some((v) => !v)) return 'skip (AWS_SES_* / SES_TEST_RECIPIENT not set)';
-  const templates = config.email?.templates ?? [];
-  await api('POST', '/api/connectors/aws-ses-mail/test', { email: to, config: { ...sesConfig, templates } });
+// Live send for `email.providers[name]` via the connector test endpoint (env from its configEnv);
+// skipped without credentials (tasks 0.3, 1.10). Cloudflare also needs the email-relay service up.
+const liveEmailCheck = async (name, recipientEnv) => {
+  const provider = config.email.providers[name];
+  const fields = Object.entries(provider.configEnv).map(([field, envVar]) => [field, process.env[envVar]]);
+  const to = process.env[recipientEnv];
+  if (!to || fields.some(([, value]) => !value)) return `skip (${[...Object.values(provider.configEnv), recipientEnv].join(' / ')} not set)`;
+  const connectorConfig = { ...Object.fromEntries(fields), ...(provider.templates ? { templates: config.email.templates } : {}) };
+  await api('POST', `/api/connectors/${provider.connectorId}/test`, { email: to, config: connectorConfig });
   return `test email sent to ${to}`;
 };
 
@@ -266,10 +263,10 @@ const checks = [
     return 'JWT carries aud, sub, client_id, role-granted scope, roles (via JWT customizer)';
   }],
 
-  ['LV-09', 'Verification and reset emails (http-email; SES when configured)', async ({ defer, newUser }) => {
+  ['LV-09', 'Verification and reset emails (http-email; SES / Cloudflare when configured)', async ({ defer, newUser }) => {
     const connectors = await api('GET', '/api/connectors');
-    let http = 'skip (no http-email connector)';
-    if (connectors.some((c) => c.connectorId === 'http-email')) {
+    let http = 'skip (http-email not on the dev mailbox)';
+    if (connectors.some((c) => c.connectorId === 'http-email' && c.config?.endpoint === config.email.devFallback.config.endpoint)) {
       defer(await startMailbox());
       await api('PATCH', '/api/sign-in-exp', { forgotPasswordMethods: ['EmailVerificationCode'] });
       const newEmail = `lv-register-${ts}@example.com`;
@@ -291,7 +288,7 @@ const checks = [
       assert((await client.signIn(user.primaryEmail, newPassword)).tokens, 'sign-in with new password failed');
       http = 'register + reset codes delivered, reset completed';
     }
-    return `http-email: ${http}; ses: ${await sesCheck()}`;
+    return `http-email: ${http}; ses: ${await liveEmailCheck('ses', 'SES_TEST_RECIPIENT')}; cloudflare: ${await liveEmailCheck('cloudflare', 'CF_TEST_RECIPIENT')}`;
   }],
 ];
 

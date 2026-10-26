@@ -2,7 +2,7 @@
 type: decision-log
 title: Decisions
 description: ADR-style log of significant technical decisions and their rationale.
-last_updated: 2026-10-24
+last_updated: 2026-10-26
 ---
 
 # Decisions
@@ -95,3 +95,6 @@ Retiring an app from `config/sso.config.json` doesn't delete it in Logto. The ow
 
 ## 2026-10-23 — Email: AWS SES or Cloudflare relay; SMTP removed (user choice)
 EM-01 picks `aws-ses-mail` or `http-email` → Cloudflare relay through a config `email.provider`. The SMTP connector entry is removed. The `http-email` dev fallback to `scripts/dev-mailbox.js` stays.
+
+## 2026-10-26 — Q1: Cloudflare email relay is a Node service (user choice)
+`apps/email-relay` runs as compose `email-relay` (profile `cloudflare`, :3096, no published port) and sends through the Cloudflare Email Sending **REST API** (API token), not a Worker `send_email` binding. Same stack as the repo, no wrangler/deploy step, templates read from `config/sso.config.json` at runtime (EM-03 stays single-source), unit-testable with an injected `fetch`. Tested against a mocked API only; the live send waits for `CF_*` credentials (LV-09 skips until then, same pattern as SES).

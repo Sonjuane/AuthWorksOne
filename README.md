@@ -53,6 +53,7 @@ E2E (Playwright, S1–S18 + scans): separate test stack, same ports as dev. One-
 | [scripts/provision.js](scripts/provision.js) | Idempotent apply of the config via Management API; writes app credentials to `.env.apps` |
 | [scripts/rotate-keys.js](scripts/rotate-keys.js) | OIDC signing-key rotation + JWKS verification |
 | [scripts/dev-mailbox.js](scripts/dev-mailbox.js) | Dev-only receiver for the `http-email` fallback connector |
+| [apps/email-relay/](apps/email-relay/) | Cloudflare email relay (compose `email-relay`, profile `cloudflare`): `http-email` POST → config template → Cloudflare Email Sending API |
 | [scripts/verify-logto.js](scripts/verify-logto.js) | Live LV-01–LV-09 checks; restores the tenant |
 | [scripts/hub-db-init.js](scripts/hub-db-init.js), [scripts/hub-migrate.js](scripts/hub-migrate.js), [scripts/hub-reencrypt.js](scripts/hub-reencrypt.js), [scripts/hub-reconcile.js](scripts/hub-reconcile.js) | Hub role/database creation, migrations, master-key re-encryption, deleted-user reconciliation |
 | [scripts/lib/](scripts/lib/) | Management API client; JWT-customizer script generator; Experience API sign-in driver; mock OIDC IdP; TOTP |
@@ -72,6 +73,7 @@ E2E (Playwright, S1–S18 + scans): separate test stack, same ports as dev. One-
 - **Enable Google Workspace login**: set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in `.env` → `npm run provision` ([docs/01-runbook.md §4](docs/01-runbook.md)).
 - **Enable GitHub login**: set `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` → `npm run provision`.
 - **Enable real email (AWS SES)**: set `AWS_SES_*` in `.env` → `npm run provision`; the dev `http-email` fallback is removed automatically ([docs/01-runbook.md §4](docs/01-runbook.md)).
+- **Enable real email (Cloudflare)**: set `EMAIL_PROVIDER=cloudflare`, `EMAIL_RELAY_*`, `CF_ACCOUNT_ID`, `CF_EMAIL_API_TOKEN` → `docker compose --profile dev --profile cloudflare up -d` → `npm run provision` ([docs/01-runbook.md §4](docs/01-runbook.md)).
 - **Assign a role by config**: put emails in the env var named by `roleAssignments[].emailsEnv` (e.g. `OWNER_EMAILS`) → `npm run provision` ([docs/01-runbook.md §4a](docs/01-runbook.md)).
 - **Rotate signing keys**: `npm run rotate-keys` ([docs/01-runbook.md §5](docs/01-runbook.md)).
 - **Verify Logto features (before any image upgrade)**: `npm run verify:logto` (needs `.env.apps` from provision). It runs the LV-01–LV-09 checks live and restores the tenant afterwards; any `FAIL` or `tenant CHANGED` blocks the upgrade.

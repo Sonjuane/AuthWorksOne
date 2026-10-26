@@ -2,7 +2,7 @@
 type: pitfall-registry
 title: Gotchas & Edge Cases
 description: Non-obvious pitfalls, edge cases, and traps discovered while working in this codebase.
-last_updated: 2026-10-24
+last_updated: 2026-10-26
 ---
 
 # Gotchas
@@ -118,3 +118,6 @@ Local `http://localhost:3001/oidc` needs `client.allowInsecureRequests` in the d
 
 ## Docker-to-host callbacks on macOS/Linux
 The `http-email` connector calls `host.docker.internal:3099`. Works out of the box on Docker Desktop (macOS/Windows); on Linux add `extra_hosts: ["host.docker.internal:host-gateway"]`.
+
+## `http-email` connector: payload and auth header
+Logto 1.45's `http-email` POSTs `{to, type, payload, ip?}` (`type` = usage type, e.g. `Register`; `payload.code`) and sends the configured `authorization` string verbatim as the `Authorization` header — so `EMAIL_RELAY_TOKEN` must be the full value (`Bearer <secret>`). The connector test endpoint (`POST /api/connectors/http-email/test`) sends `type: Generic`. A non-2xx relay response surfaces in Logto as `400 connector.general` with the relay's body in `data.message`.

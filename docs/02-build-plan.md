@@ -42,8 +42,9 @@ Legend: **Reqs** = spec IDs satisfied; **S#** = spec §7.2 acceptance scenario.
 
 **Status 2026-10-24 (Logto 1.45.0):** Done: 1.1–1.9, 1.11–1.13, 1.15. Proof: `npm test` 6/6, `npm run test:int` 8/8 (includes S9 and S20), `npm run verify:logto` 9/9 with the tenant unchanged.
 
+**Update 2026-10-26:** 1.10 done (Q1 resolved: Node relay service). Proof: `npm test` 107/107 (5 new relay tests against a mocked Cloudflare API); `verify:logto -- --only LV-09` PASS (cloudflare `skip`, no `CF_*` env); in compose, Logto's `http-email` connector test reached `email-relay`, which rejected a wrong token (401) and passed the real Cloudflare API's dummy-token error back as a 502. A live send is still pending credentials.
+
 Open:
-- **1.10:** blocked on Q1.
 - **1.14:** only the key-rotation test is left; it moves to Phase 2 (task 2.7) because it needs the Hub's JWT verifier.
 
 Verified only on their skip path, because the credentials or mock don't exist yet:
@@ -64,7 +65,7 @@ The `Hub: user deleted` hook is provisioned `enabled: false` until task 5.4.
 | 1.7 Account Center fields `mfa: Edit`, `session: Edit` | ID-04, UI-01, LV-04 | config | `GET /api/account-center` fields include both. |
 | 1.8 Profile fields: keep `displayName`/`jobTitle`; avatar = `avatar`, timezone = `profile.zoneinfo` (Account API) | ID-06 | config (`accountCenter.fields.avatar/profile` already `Edit`) | Integration: `PATCH /api/my-account/profile {zoneinfo}` → 200; `GET` returns it. |
 | 1.9 `email` section replaces SMTP entries: `provider` (`ses` \| `cloudflare`, env override `EMAIL_PROVIDER`), shared `templates`, `devFallback` endpoint | EM-01, EM-02, EM-03 | config + schema, `scripts/provision.js`, `.env.example`, runbook §4 | No provider env → `= http-email (dev fallback)`. SES env → `+ aws-ses-mail`, `- http-email (dev fallback removed)`, SES `templates` equal config. |
-| 1.10 Cloudflare relay — **blocked on open question Q1** | EM-01 (cloudflare), EM-03 | TBD | Relay receives `http-email` POST `{to,type,payload.code}`, renders config template, sends; LV-09 probe passes with `--email cloudflare`. |
+| 1.10 Cloudflare relay (Q1: Node service in compose, Cloudflare Email Sending REST API) | EM-01 (cloudflare), EM-03 | `apps/email-relay/{relay,server}.js`, `docker-compose.yml` (`email-relay`, profile `cloudflare`), `scripts/verify-logto.js`, `.env.example`, runbook §4 | **Done** 2026-10-26: relay receives `http-email` POST `{to,type,payload.code}`, checks `Authorization`, renders the config template (`Generic` fallback), sends. Unit tests in `test/unit/email-relay.test.js`. Live: with `CF_*`, `EMAIL_RELAY_*` and `CF_TEST_RECIPIENT` set, LV-09 reports `cloudflare: test email sent`. |
 | 1.11 Webhook: `hooks[]` (`User.Deleted` → Hub); signing key written to `.env.apps` as `HUB_WEBHOOK_SIGNING_KEY` | VA-08, NF-10 | config + schema, `scripts/provision.js` | `GET /api/hooks` shows hook; second run `=`; `.env.apps` has key. |
 | 1.12 Role assignments via config (`roleAssignments[]`, `emailsEnv`) — see Q6 | ID-07, AD-02 | config + schema, `scripts/provision.js` | S9. |
 | 1.13 Provision idempotency test | NF-10, AD-02 | `test/integration/provision.test.js` | S20: second run has zero `+` lines. |
@@ -687,7 +688,7 @@ URL split: browser-facing authorize URLs use `http://localhost:3097`; container-
 
 | # | Question | Blocks |
 |---|---|---|
-| Q1 | Cloudflare relay: build it here (Cloudflare Worker with the email-sending binding, or a Node service)? `http-email` sends only `{to, type, payload.code}`, so the relay must render EM-03 templates. | 1.10, EM-01/EM-03 Cloudflare path |
+| Q1 | **Resolved 2026-10-26 (Node service):** `apps/email-relay` runs in compose and calls the Cloudflare Email Sending REST API (API token), rendering EM-03 templates from config at runtime. Tested against a mocked API; the live send waits for credentials. | 1.10, EM-01/EM-03 Cloudflare path |
 | Q2 | **Resolved 2026-10-24 (persistent test volume):** E2E runs against a separate compose project and volume (e.g. `authworks-test`), bootstrapped by hand once (runbook §2) like dev. Tests clean up after themselves. Starting from an empty DB in CI is out of scope. | 8.1, CI |
 | Q3 | **Resolved 2026-10-24:** `POST /v1/credentials` accepts `{connectionId}` or `{connectorId}`. | 5.2, S5 |
 | Q4 | **Resolved 2026-10-24:** `GET /v1/manifest` (generated tools list) only; no MCP JSON-RPC transport. | 3.1 |
