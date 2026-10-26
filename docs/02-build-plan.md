@@ -178,7 +178,7 @@ How it's built:
 - The CSP stays strict (`default-src 'self'`); `img-src` adds `data:` (branding logo) and `https:` (avatars).
 - Roles are read at sign-in from a Hub-resource JWT; admin access is enforced server-side.
 
-Retiring the profile app (6.7): `apps/profile-app` is removed. **Owner action:** delete "Profile App" in Console → Applications (Q10).
+Retiring the profile app (6.7): `apps/profile-app` is removed. "Profile App" was deleted from the dev tenant on 2026-10-26 (Management API, on the owner's request), after checks found no config, repo, or env reference and no use since 2026-10-24. After deletion: provision `=` only; `test:int` 56 passed, 1 skipped; `verify:logto` 9/9.
 
 | Task | Reqs | Files | Done check |
 |---|---|---|---|

@@ -34,7 +34,7 @@ Required once per fresh database, before `npm run provision` works.
 
 Provision output legend: `+` created, `=` exists/updated, `-` skipped (with reason). Re-running is safe.
 
-**Retire an app**: remove its entry from `applications`, then delete it once in Console → Applications. Provision never deletes apps (build plan Q10). Pending: delete **"Profile App"** (retired with the Hub UI Account page; `PROFILE_APP_*` disappears from `.env.apps` on the next provision).
+**Retire an app**: remove its entry from `applications`, then delete it once in Console → Applications. Provision never deletes apps (build plan Q10). Before deleting, check the app is not in config, its client ID is not in the repo or env files, and `GET /api/logs?applicationId=<id>` shows no recent use. "Profile App" was deleted from the dev tenant on 2026-10-26.
 
 ## 4. Connectors
 

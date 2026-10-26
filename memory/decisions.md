@@ -101,3 +101,6 @@ EM-01 picks `aws-ses-mail` or `http-email` → Cloudflare relay through a config
 
 ## 2026-10-26 — Q14: keep Logto's Account Center profile page hidden (user choice)
 Logto 1.45 can show an Account Center "Personal info" page when `accountCenter.profileFields` is set. Config leaves it unset, so profile and custom-field editing stays in one place: the Hub UI Account page (UI-01). Chosen over enabling it via config, which would make the profile editable in two places and add schema/provision/test work.
+
+## 2026-10-26 — "Profile App" deleted from the dev tenant (user request)
+The owner asked the agent to verify and remove it, so it was deleted via `DELETE /api/applications/{id}` instead of the Console step Q10 named. Checks first: not in config, client ID absent from repo and env files, last log entry 2026-10-24 (before retirement). Q10 itself is unchanged: provision still never deletes apps. The `authworks-test` tenant was not checked.
